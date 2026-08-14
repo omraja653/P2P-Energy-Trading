@@ -1,0 +1,24 @@
+const { matchListings } = require('../services/matchingEngine');
+
+describe('matchingEngine.matchListings', () => {
+  const listings = [
+    { status: 'available', pricePerKwh: 0.15, energyAmountKwh: 5 },
+    { status: 'available', pricePerKwh: 0.1, energyAmountKwh: 3 },
+    { status: 'sold', pricePerKwh: 0.05, energyAmountKwh: 10 },
+  ];
+
+  it('prefers lower-priced listings first', () => {
+    const { matches } = matchListings(listings, 3);
+    expect(matches[0].listing.pricePerKwh).toBe(0.1);
+  });
+
+  it('ignores listings that are not available', () => {
+    const { matches } = matchListings(listings, 100);
+    expect(matches.every((m) => m.listing.status === 'available')).toBe(true);
+  });
+
+  it('reports unmatched demand when supply runs out', () => {
+    const { unmatchedKwh } = matchListings(listings, 100);
+    expect(unmatchedKwh).toBeGreaterThan(0);
+  });
+});
