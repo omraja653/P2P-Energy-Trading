@@ -7,7 +7,7 @@ const router = express.Router();
 
 router.get('/', requireAuth, async (req, res, next) => {
   try {
-    const settlements = await Settlement.find().populate('trade').sort({ createdAt: -1 });
+    const settlements = await Settlement.find().populate('tradeId').sort({ createdAt: -1 });
     res.json(settlements);
   } catch (err) {
     next(err);
@@ -23,7 +23,8 @@ router.post('/:tradeId', requireAuth, requireRole('admin'), async (req, res, nex
 
     const settlement = await settleTrade(trade);
     trade.status = 'settled';
-    trade.txHash = settlement.settledTxHash;
+    trade.blockchainTxHash = settlement.blockchainTxHash;
+    trade.settledAt = settlement.settledAt;
     await trade.save();
 
     res.status(201).json(settlement);

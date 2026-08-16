@@ -17,9 +17,9 @@ function requireAuth(req, res, next) {
   }
 }
 
-function requireRole(...roles) {
+function requireRole(...types) {
   return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user || !types.includes(req.user.type)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
     next();

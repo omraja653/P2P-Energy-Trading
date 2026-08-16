@@ -6,7 +6,10 @@ const router = express.Router();
 
 router.get('/listings', async (req, res, next) => {
   try {
-    const listings = await EnergyListing.find({ status: 'available' }).populate('seller', 'name');
+    const listings = await EnergyListing.find({ status: 'active' }).populate(
+      'prosumerId',
+      'firstName lastName'
+    );
     res.json(listings);
   } catch (err) {
     next(err);
@@ -16,8 +19,8 @@ router.get('/listings', async (req, res, next) => {
 router.get('/quote', async (req, res, next) => {
   try {
     const availableSupplyKwh = await EnergyListing.aggregate([
-      { $match: { status: 'available' } },
-      { $group: { _id: null, total: { $sum: '$energyAmountKwh' } } },
+      { $match: { status: 'active' } },
+      { $group: { _id: null, total: { $sum: '$quantityKWh' } } },
     ]);
 
     const price = calculatePrice({
