@@ -36,12 +36,6 @@ npm install
 npx hardhat compile
 ```
 
-## Timeline
-- Sprint 1 (Aug 14-27): Architecture & Setup
-- Sprint 2 (Aug 28-Sep 10): Smart Contracts & Backend
-- Sprint 3 (Sep 11-24): Frontend Development
-- Sprint 4 (Sep 25-Oct 8): Integration & Testing
-- Demo Day: October 10, 2024
 
 ## Technology Stack
 - **Frontend**: React, Vite, Tailwind CSS, Ethers.js, MetaMask
@@ -49,5 +43,4 @@ npx hardhat compile
 - **Blockchain**: Solidity, Hardhat, Polygon Amoy Testnet
 - **Deployment**: Vercel (frontend), Railway (backend)
 
-## Documentation
-See individual README.md files in each folder.
+
