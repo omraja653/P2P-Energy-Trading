@@ -5,6 +5,7 @@ const pricing = require('./pricing');
 const trades = require('./trades');
 const settlements = require('./settlements');
 const chat = require('./chat');
+const admin = require('./admin');
 
 const router = express.Router();
 
@@ -14,5 +15,6 @@ router.use('/pricing', pricing);
 router.use('/trades', trades);
 router.use('/settlements', settlements);
 router.use('/chat', chat);
+router.use('/admin', admin);
 
 module.exports = router;

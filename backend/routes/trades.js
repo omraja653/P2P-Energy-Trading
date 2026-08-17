@@ -1,6 +1,7 @@
 const express = require('express');
 const { Trade, EnergyListing } = require('../models');
 const { requireAuth } = require('../middleware/auth');
+const { requireTradingVerification } = require('../middleware/verification');
 const { requireFields } = require('../middleware/validation');
 const { matchListings } = require('../services/matchingEngine');
 
@@ -10,7 +11,10 @@ router.get('/', requireAuth, async (req, res, next) => {
   try {
     const trades = await Trade.find({
       $or: [{ buyerId: req.user.id }, { sellerId: req.user.id }],
-    }).sort({ createdAt: -1 });
+    })
+      .sort({ createdAt: -1 })
+      .populate('buyerId', 'firstName lastName')
+      .populate('sellerId', 'firstName lastName');
     res.json(trades);
   } catch (err) {
     next(err);
@@ -20,6 +24,7 @@ router.get('/', requireAuth, async (req, res, next) => {
 router.post(
   '/',
   requireAuth,
+  requireTradingVerification,
   requireFields(['quantityKWh', 'tradingType']),
   async (req, res, next) => {
     try {

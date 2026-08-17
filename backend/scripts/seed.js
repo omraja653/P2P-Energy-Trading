@@ -54,55 +54,78 @@ async function main() {
   // --- Users ---------------------------------------------------------
   console.log('Creating users...');
 
+  // Demo accounts are pre-verified (status ACTIVE, both OTP flags true) so
+  // they can log in immediately — they never actually went through the
+  // real registration/OTP flow.
   const admin = new User({
     email: 'admin@energytrading.com',
+    mobileNumber: '+10000000001',
     firstName: 'Grid',
     lastName: 'Admin',
     type: 'admin',
     kycVerified: true,
+    status: 'ACTIVE',
+    emailVerified: true,
+    mobileVerified: true,
   });
   admin.password = 'Admin1234';
   await admin.save();
 
   const alice = new User({
     email: 'alice.prosumer@example.com',
+    mobileNumber: '+10000000002',
     firstName: 'Alice',
     lastName: 'Nguyen',
     type: 'prosumer',
     walletAddress: fakeWalletAddress(),
     kycVerified: true,
+    status: 'ACTIVE',
+    emailVerified: true,
+    mobileVerified: true,
   });
   alice.password = 'Password123';
   await alice.save();
 
   const david = new User({
     email: 'david.prosumer@example.com',
+    mobileNumber: '+10000000003',
     firstName: 'David',
     lastName: 'Okafor',
     type: 'prosumer',
     walletAddress: fakeWalletAddress(),
     kycVerified: true,
+    status: 'ACTIVE',
+    emailVerified: true,
+    mobileVerified: true,
   });
   david.password = 'Password123';
   await david.save();
 
   const bob = new User({
     email: 'bob.consumer@example.com',
+    mobileNumber: '+10000000004',
     firstName: 'Bob',
     lastName: 'Martins',
     type: 'consumer',
     walletAddress: fakeWalletAddress(),
     kycVerified: false,
+    status: 'ACTIVE',
+    emailVerified: true,
+    mobileVerified: true,
   });
   bob.password = 'Password123';
   await bob.save();
 
   const carol = new User({
     email: 'carol.consumer@example.com',
+    mobileNumber: '+10000000005',
     firstName: 'Carol',
     lastName: 'Silva',
     type: 'consumer',
     kycVerified: false,
+    status: 'ACTIVE',
+    emailVerified: true,
+    mobileVerified: true,
   });
   carol.password = 'Password123';
   await carol.save();
