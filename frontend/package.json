@@ -2,7 +2,7 @@
   "name": "energy-trading-frontend",
   "private": true,
   "version": "1.0.0",
-  "description": "P2P Energy Trading Platform Frontend",
+  "description": "GridMate - P2P Energy Trading Platform Frontend",
   "type": "module",
   "scripts": {
     "dev": "vite",

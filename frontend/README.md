@@ -1,4 +1,4 @@
-# P2P Energy Trading Platform - Frontend
+# GridMate - Frontend
 
 React + Vite + Tailwind CSS frontend for the energy trading marketplace.
 

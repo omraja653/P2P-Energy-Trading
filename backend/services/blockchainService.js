@@ -1,10 +1,10 @@
 const { getEnergyTradeContract, getPlatformWallet } = require('../config/blockchain');
 
-async function recordTradeOnChain({ buyer, seller, energyAmountKwh, totalPrice }) {
+async function recordTradeOnChain({ buyerId, sellerId, quantityKWh, totalAmount }) {
   const wallet = getPlatformWallet();
   const contract = getEnergyTradeContract(wallet);
 
-  const tx = await contract.recordTrade(buyer, seller, energyAmountKwh, totalPrice);
+  const tx = await contract.recordTrade(buyerId, sellerId, quantityKWh, totalAmount);
   const receipt = await tx.wait();
 
   return receipt.hash;

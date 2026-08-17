@@ -1,6 +1,6 @@
 const STATUS_LABELS = {
-  pending: 'Pending Match',
   matched: 'Matched',
+  verified: 'Verified',
   settled: 'Settled',
   cancelled: 'Cancelled',
 }

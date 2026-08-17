@@ -1,10 +1,10 @@
 /**
- * Naive first-fit matcher: pairs a buy request against available listings
+ * Naive first-fit matcher: pairs a buy request against active listings
  * ordered by lowest price first. Placeholder for a real order-book matcher.
  */
 function matchListings(listings, requestedKwh) {
   const sorted = [...listings]
-    .filter((listing) => listing.status === 'available')
+    .filter((listing) => listing.status === 'active')
     .sort((a, b) => a.pricePerKwh - b.pricePerKwh);
 
   const matches = [];
@@ -12,7 +12,7 @@ function matchListings(listings, requestedKwh) {
 
   for (const listing of sorted) {
     if (remaining <= 0) break;
-    const amount = Math.min(remaining, listing.energyAmountKwh);
+    const amount = Math.min(remaining, listing.quantityKWh);
     matches.push({ listing, amount });
     remaining -= amount;
   }

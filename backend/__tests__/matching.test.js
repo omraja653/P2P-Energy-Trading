@@ -2,9 +2,9 @@ const { matchListings } = require('../services/matchingEngine');
 
 describe('matchingEngine.matchListings', () => {
   const listings = [
-    { status: 'available', pricePerKwh: 0.15, energyAmountKwh: 5 },
-    { status: 'available', pricePerKwh: 0.1, energyAmountKwh: 3 },
-    { status: 'sold', pricePerKwh: 0.05, energyAmountKwh: 10 },
+    { status: 'active', pricePerKwh: 0.15, quantityKWh: 5 },
+    { status: 'active', pricePerKwh: 0.1, quantityKWh: 3 },
+    { status: 'matched', pricePerKwh: 0.05, quantityKWh: 10 },
   ];
 
   it('prefers lower-priced listings first', () => {
@@ -12,9 +12,9 @@ describe('matchingEngine.matchListings', () => {
     expect(matches[0].listing.pricePerKwh).toBe(0.1);
   });
 
-  it('ignores listings that are not available', () => {
+  it('ignores listings that are not active', () => {
     const { matches } = matchListings(listings, 100);
-    expect(matches.every((m) => m.listing.status === 'available')).toBe(true);
+    expect(matches.every((m) => m.listing.status === 'active')).toBe(true);
   });
 
   it('reports unmatched demand when supply runs out', () => {

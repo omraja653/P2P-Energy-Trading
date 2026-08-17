@@ -1,0 +1,10 @@
+{
+  "energyTradeAddress": "0xa842484C20d67c0E7C5c556679dB3Cb3366B190d",
+  "settlementAddress": "0x5Bf7A776ad23f96cAF94650b992Fd677Bb9b6C40",
+  "deployerAddress": "0xf16DB4D3cAe7B5F3D98a69AF94B5E91C6dC25cae",
+  "platformWalletAddress": "0xf16DB4D3cAe7B5F3D98a69AF94B5E91C6dC25cae",
+  "platformFeeBps": 200,
+  "deploymentDate": "2026-08-16T11:16:43.077Z",
+  "network": "polygonAmoy",
+  "chainId": 80002
+}
