@@ -4,6 +4,7 @@ const smartmeter = require('./smartmeter');
 const pricing = require('./pricing');
 const trades = require('./trades');
 const settlements = require('./settlements');
+const chat = require('./chat');
 
 const router = express.Router();
 
@@ -12,5 +13,6 @@ router.use('/smartmeter', smartmeter);
 router.use('/pricing', pricing);
 router.use('/trades', trades);
 router.use('/settlements', settlements);
+router.use('/chat', chat);
 
 module.exports = router;
