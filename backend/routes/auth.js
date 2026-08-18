@@ -49,6 +49,7 @@ function publicUser(user) {
     lastName: user.lastName,
     type: user.type || null,
     walletAddress: user.walletAddress,
+    location: user.location || null,
     kycVerified: user.kycVerified,
     status: user.status,
     emailVerified: user.emailVerified,
@@ -565,6 +566,35 @@ router.patch('/role', requireAuth, requireFields(['type']), async (req, res, nex
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     user.type = type;
+    await user.save();
+
+    res.json({ user: publicUser(user), token: signToken(user) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/location', requireAuth, requireFields(['lat', 'lng']), async (req, res, next) => {
+  try {
+    const lat = Number(req.body.lat);
+    const lng = Number(req.body.lng);
+
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+      return res.status(400).json({ error: 'lat must be a valid latitude between -90 and 90' });
+    }
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+      return res.status(400).json({ error: 'lng must be a valid longitude between -180 and 180' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    user.location = {
+      lat,
+      lng,
+      label: req.body.label?.trim() || user.location?.label || 'My location',
+      city: req.body.city?.trim() || user.location?.city || '',
+    };
     await user.save();
 
     res.json({ user: publicUser(user), token: signToken(user) });

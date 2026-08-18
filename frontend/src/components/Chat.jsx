@@ -4,7 +4,7 @@ import api from '../services/api.js'
 const GREETING = {
   role: 'assistant',
   content:
-    "Hi! I'm GridMate. Ask me about current prices, how P2P trading works, or your recent trades — or tap a quick action below.",
+    "Hi! I'm GridMate. Ask me about current prices, how P2P trading works, or your recent trades or tap a quick action below.",
 }
 
 const QUICK_ACTIONS = [

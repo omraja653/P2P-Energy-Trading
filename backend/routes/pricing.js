@@ -56,7 +56,7 @@ router.get('/listings', async (req, res, next) => {
   try {
     const listings = await EnergyListing.find({ status: 'active' }).populate(
       'prosumerId',
-      'firstName lastName'
+      'firstName lastName type location city'
     );
     res.json(listings);
   } catch (err) {

@@ -95,6 +95,12 @@ const userSchema = new mongoose.Schema(
     },
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
+    location: {
+      lat: { type: Number, min: -90, max: 90 },
+      lng: { type: Number, min: -180, max: 180 },
+      label: { type: String, trim: true },
+      city: { type: String, trim: true },
+    },
     // Know-Your-Customer verification flag — gates real-money trading/settlement.
     kycVerified: { type: Boolean, default: false },
   },

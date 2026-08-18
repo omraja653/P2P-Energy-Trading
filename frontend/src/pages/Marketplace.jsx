@@ -5,6 +5,7 @@ import { buyEnergy } from '../services/trades.js'
 import StatCard from '../components/StatCard.jsx'
 import ListingCard from '../components/ListingCard.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
+import GoogleMapPanel from '../components/GoogleMapPanel.jsx'
 import { formatCurrency, formatKwh, formatDateTime } from '../utils/formatting.js'
 
 const SORT_OPTIONS = [
@@ -103,6 +104,8 @@ function Marketplace() {
     <div className="min-h-[calc(100vh-64px)] bg-[#f5f5f5]">
       <div className="mx-auto max-w-6xl p-6 md:p-8">
         <h1 className="text-2xl font-bold text-slate-900">P2P Energy Marketplace</h1>
+
+        {listings.data && <GoogleMapPanel listings={listings.data} />}
 
         {/* Market overview */}
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

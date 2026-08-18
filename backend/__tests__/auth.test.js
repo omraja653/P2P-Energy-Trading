@@ -359,6 +359,35 @@ describe('POST /api/auth/request-mobile-otp (adding mobile after the fact)', () 
   });
 });
 
+describe('PATCH /api/auth/location', () => {
+  it('stores a user location and returns it in the session payload', async () => {
+    const user = await User.findOne({ email: TEST_EMAIL });
+    const token = require('jsonwebtoken').sign({ id: user._id }, process.env.JWT_SECRET || 'test-secret');
+
+    const res = await request(app)
+      .patch('/api/auth/location')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        lat: 12.9716,
+        lng: 77.5946,
+        label: 'Bengaluru, India',
+        city: 'Bengaluru',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.user.location).toMatchObject({
+      lat: 12.9716,
+      lng: 77.5946,
+      label: 'Bengaluru, India',
+      city: 'Bengaluru',
+    });
+
+    const saved = await User.findById(user._id);
+    expect(saved.location.lat).toBe(12.9716);
+    expect(saved.location.lng).toBe(77.5946);
+  });
+});
+
 describe('GET /api/auth/me', () => {
   it('requires auth', async () => {
     const res = await request(app).get('/api/auth/me');

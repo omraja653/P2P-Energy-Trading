@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.js'
 import { dashboardPathFor } from '../utils/dashboardPath.js'
@@ -21,10 +21,11 @@ function NavLinkItem({ to, children }) {
 }
 
 function UserDropdown({ user }) {
-  const { updateUserRole } = useAuth()
+  const { updateUserRole, updateUserLocation } = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [switching, setSwitching] = useState(false)
+  const [locationLoading, setLocationLoading] = useState(false)
   const [error, setError] = useState('')
 
   async function switchRole(type) {
@@ -40,6 +41,39 @@ function UserDropdown({ user }) {
     } finally {
       setSwitching(false)
     }
+  }
+
+  async function shareCurrentLocation() {
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported in this browser.')
+      return
+    }
+
+    setLocationLoading(true)
+    setError('')
+
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          await updateUserLocation({
+            lat: coords.latitude,
+            lng: coords.longitude,
+            label: 'My location',
+            city: 'Current location',
+          })
+          setOpen(false)
+        } catch (err) {
+          setError(err.response?.data?.error || 'Could not save your location')
+        } finally {
+          setLocationLoading(false)
+        }
+      },
+      () => {
+        setError('Location access was denied. Please allow it to share your location.')
+        setLocationLoading(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
   }
 
   return (
@@ -70,6 +104,15 @@ function UserDropdown({ user }) {
                 <p className="px-2 py-1.5 text-sm font-medium text-slate-700">Admin</p>
               ) : (
                 <>
+                  <button
+                    type="button"
+                    disabled={locationLoading}
+                    onClick={shareCurrentLocation}
+                    className="mb-3 block w-full rounded px-2 py-1.5 text-left text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {locationLoading ? 'Sharing location...' : 'Share my location'}
+                  </button>
+
                   <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                     Switch role
                   </p>
@@ -98,10 +141,38 @@ function UserDropdown({ user }) {
 }
 
 function Navbar() {
-  const { user, logout } = useAuth()
+  const { user, logout, updateUserLocation } = useAuth()
   const navigate = useNavigate()
 
   const dashboardPath = dashboardPathFor(user?.type) || '/login'
+
+  useEffect(() => {
+    if (!user || user.type !== 'prosumer' || user.location?.lat != null || user.location?.lng != null) return
+    if (!('geolocation' in navigator)) return
+
+    const timeoutId = setTimeout(() => {
+      navigator.geolocation.getCurrentPosition(
+        async ({ coords }) => {
+          try {
+            await updateUserLocation({
+              lat: coords.latitude,
+              lng: coords.longitude,
+              label: 'My location',
+              city: 'Current location',
+            })
+          } catch (error) {
+            // Silent fail here: the user can still use the manual menu option later.
+          }
+        },
+        () => {
+          // Silent fail on denial so the app doesn't spam permission prompts.
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      )
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [user, updateUserLocation])
 
   function handleLogout() {
     logout()

@@ -21,16 +21,17 @@ function VerificationGate({ children }) {
 
   const user = data.user
 
-  if (!user.mobileVerified) {
-    return (
-      <MobileVerificationModal
-        onDone={(updatedUser) => {
-          setSession({ user: updatedUser })
-          setRefreshKey((k) => k + 1)
-        }}
-      />
-    )
-  }
+  // TEMP: Mobile verification bypassed until Twilio upgrade
+  // if (!user.mobileVerified) {
+  //   return (
+  //     <MobileVerificationModal
+  //       onDone={(updatedUser) => {
+  //         setSession({ user: updatedUser })
+  //         setRefreshKey((k) => k + 1)
+  //       }}
+  //     />
+  //   )
+  // }
 
   if (!user.kycVerified) {
     return <KYCVerificationModal />

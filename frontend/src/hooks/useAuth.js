@@ -6,6 +6,7 @@ import {
   loginWithMobileOtp as loginWithMobileOtpRequest,
   resetPassword as resetPasswordRequest,
   updateUserRole as updateUserRoleRequest,
+  updateUserLocation as updateUserLocationRequest,
   logout as clearSession,
   getStoredUser,
 } from '../services/auth.js'
@@ -50,6 +51,11 @@ export function useAuth() {
     [applySession]
   )
 
+  const updateUserLocation = useCallback(
+    async (location) => applySession(await updateUserLocationRequest(location)),
+    [applySession]
+  )
+
   // Lets a caller that already has a { user, token } payload (e.g. the
   // verify-email-otp / verify-mobile-otp responses, which log the user in
   // directly) persist it without a redundant extra API call.
@@ -69,6 +75,7 @@ export function useAuth() {
     loginWithMobileOtp,
     resetPassword,
     updateUserRole,
+    updateUserLocation,
     setSession,
     logout,
     isAuthenticated: Boolean(user),

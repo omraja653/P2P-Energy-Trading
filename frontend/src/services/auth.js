@@ -77,6 +77,11 @@ export async function updateUserRole(type) {
   return storeSession(data)
 }
 
+export async function updateUserLocation(location) {
+  const { data } = await api.patch('/auth/location', location)
+  return storeSession(data)
+}
+
 export async function getMe() {
   const { data } = await api.get('/auth/me')
   return data

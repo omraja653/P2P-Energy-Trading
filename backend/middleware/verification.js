@@ -14,11 +14,20 @@ async function requireTradingVerification(req, res, next) {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    if (!user.mobileVerified || !user.kycVerified) {
+    // TEMP: Mobile verification bypassed until Twilio upgrade
+    // if (!user.mobileVerified || !user.kycVerified) {
+    //   return res.status(403).json({
+    //     error: 'Verification required before trading',
+    //     requiresMobileVerification: !user.mobileVerified,
+    //     requiresKyc: !user.kycVerified,
+    //   });
+    // }
+
+    if (!user.kycVerified) {
       return res.status(403).json({
-        error: 'Verification required before trading',
-        requiresMobileVerification: !user.mobileVerified,
-        requiresKyc: !user.kycVerified,
+        error: 'KYC verification required before trading',
+        requiresMobileVerification: false,
+        requiresKyc: true,
       });
     }
 
