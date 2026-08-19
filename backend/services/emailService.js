@@ -71,4 +71,32 @@ async function sendPasswordResetOtp(toEmail, otp) {
   return { delivered: true, fallback: false };
 }
 
-module.exports = { sendEmailOtp, sendPasswordResetOtp, isEmailConfigured };
+/**
+ * Generic notification email for the ticketing system — one function reused
+ * for all 4 events (created / assigned / updated / resolved) rather than 4
+ * near-duplicate senders, since only the subject/heading/body differ.
+ * Never throws on failure to send — ticket actions must succeed even if
+ * notification delivery has a hiccup, so callers fire-and-log rather than
+ * await-and-fail the whole request over an email.
+ */
+async function sendTicketNotification({ toEmail, subject, heading, body }) {
+  if (!isEmailConfigured()) {
+    console.log(`[emailService:DEV FALLBACK] Ticket email to ${toEmail}: "${subject}" — ${body}`);
+    return { delivered: false, fallback: true };
+  }
+
+  try {
+    await sendViaBrevo({
+      toEmail,
+      subject: `[GridMate Support] ${subject}`,
+      text: `${heading}\n\n${body}`,
+      html: `<p><strong>${heading}</strong></p><p>${body}</p>`,
+    });
+    return { delivered: true, fallback: false };
+  } catch (err) {
+    console.error('Ticket notification email failed:', err.message);
+    return { delivered: false, fallback: false, error: err.message };
+  }
+}
+
+module.exports = { sendEmailOtp, sendPasswordResetOtp, sendTicketNotification, isEmailConfigured };

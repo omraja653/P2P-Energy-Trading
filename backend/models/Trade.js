@@ -34,15 +34,35 @@ const tradeSchema = new mongoose.Schema(
     },
     // Lifecycle: matched (just paired) -> verified (meter data confirms
     // delivery) -> settled (payment split executed) -> cancelled.
+    // 'disputed' is an admin-only side-branch (PATCH /api/admin/trades/:id/dispute)
+    // that can be raised from any non-terminal status and resolved back to
+    // settled/cancelled by an admin decision.
     status: {
       type: String,
-      enum: ['matched', 'verified', 'settled', 'cancelled'],
+      enum: ['matched', 'verified', 'settled', 'cancelled', 'disputed'],
       default: 'matched',
     },
     blockchainTxHash: { type: String, default: null },
     matchedAt: { type: Date, default: Date.now },
     verifiedAt: { type: Date, default: null },
     settledAt: { type: Date, default: null },
+    // Dispute fields — only meaningful once status has been 'disputed' at
+    // least once. `statusBeforeDispute` lets a resolution restore the prior
+    // status when the decision is "no action needed".
+    dispute: {
+      reason: { type: String, trim: true },
+      raisedAt: { type: Date },
+      raisedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      statusBeforeDispute: { type: String },
+      decision: {
+        type: String,
+        enum: ['approve_trade', 'refund_consumer', 'refund_both', 'no_action', null],
+        default: null,
+      },
+      resolutionNotes: { type: String, trim: true },
+      resolvedAt: { type: Date },
+      resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    },
   },
   { timestamps: true }
 );

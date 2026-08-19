@@ -84,6 +84,13 @@ function UserDropdown({ user }) {
         style={{ color: '#ffffff' }}
         className="flex items-center gap-2 rounded-lg bg-white/15 px-3 py-2 text-sm font-medium transition hover:bg-white/25"
       >
+        {user.profilePicture ? (
+          <img src={user.profilePicture} alt="" className="h-6 w-6 rounded-full object-cover" />
+        ) : (
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/25 text-xs">
+            {`${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase()}
+          </span>
+        )}
         <span>{user.firstName}</span>
         <span className="capitalize text-white/80">({user.type || 'no role'})</span>
         <span aria-hidden="true">▾</span>
@@ -98,6 +105,22 @@ function UserDropdown({ user }) {
                 {user.firstName} {user.lastName}
               </p>
               <p className="truncate text-xs text-slate-500">{user.email}</p>
+            </div>
+            <div className="border-b border-slate-100 px-2 py-2">
+              <Link
+                to="/profile"
+                onClick={() => setOpen(false)}
+                className="block w-full rounded px-2 py-1.5 text-left text-sm text-slate-600 transition hover:bg-slate-50"
+              >
+                My Profile
+              </Link>
+              <Link
+                to="/support"
+                onClick={() => setOpen(false)}
+                className="block w-full rounded px-2 py-1.5 text-left text-sm text-slate-600 transition hover:bg-slate-50"
+              >
+                Support Center
+              </Link>
             </div>
             <div className="px-2 py-2">
               {user.type === 'admin' ? (
@@ -191,8 +214,16 @@ function Navbar() {
         {/* Links */}
         <div className="flex flex-wrap items-center gap-1">
           <NavLinkItem to={dashboardPath}>Dashboard</NavLinkItem>
-          <NavLinkItem to="/marketplace">Marketplace</NavLinkItem>
-          <NavLinkItem to="/trade-history">Trade History</NavLinkItem>
+          {user?.type !== 'support' && (
+            <>
+              <NavLinkItem to="/marketplace">Marketplace</NavLinkItem>
+              <NavLinkItem to="/trade-history">Trade History</NavLinkItem>
+            </>
+          )}
+          <NavLinkItem to="/support">Support</NavLinkItem>
+          {(user?.type === 'support' || user?.type === 'admin') && (
+            <NavLinkItem to="/support-dashboard">Support Dashboard</NavLinkItem>
+          )}
         </div>
 
         {/* User dropdown + Logout */}

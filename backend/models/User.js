@@ -56,9 +56,16 @@ const userSchema = new mongoose.Schema(
     // verification succeeds (or immediately for Google sign-ups). Mobile
     // verification is independent of this: it's optional and gates its own
     // things (mobile-OTP login, trading) rather than account activation.
+    // SUSPENDED/BLOCKED are admin-only actions (PATCH /api/admin/users/:id/status)
+    // — suspended is meant as reversible (admin can reactivate), blocked is
+    // the harder stop, but both are enforced the same way today: requireAuth
+    // only checks the JWT, not this flag, so login itself isn't blocked by
+    // it. requireTradingVerification/other gates would need to check this to
+    // actually shut a suspended/blocked account out of the app — not wired
+    // in yet, flagged rather than silently assumed to work end-to-end.
     status: {
       type: String,
-      enum: ['PENDING', 'ACTIVE'],
+      enum: ['PENDING', 'ACTIVE', 'SUSPENDED', 'BLOCKED'],
       default: 'PENDING',
     },
     emailVerified: { type: Boolean, default: false },
@@ -75,14 +82,17 @@ const userSchema = new mongoose.Schema(
     resetPasswordOtp: { type: String, select: false },
     resetPasswordOtpExpiresAt: { type: Date, select: false },
     // consumer = only buys energy, prosumer = generates and can sell surplus.
-    // 'admin' is an internal addition (beyond the consumer/prosumer spec) so
-    // routes like settlement-triggering have someone authorized to call them.
-    // Deliberately NOT required / no default — new accounts (local or
-    // Google) start with no type at all, and the frontend's RoleSelector
-    // modal is what sets it post-login, exactly once, via PATCH /auth/role.
+    // 'admin' and 'support' are internal additions (beyond the
+    // consumer/prosumer spec): admin for settlement-triggering routes,
+    // support for the ticketing system. Neither is self-assignable — both
+    // are created directly (seed data / admin action), never via
+    // PATCH /auth/role. Deliberately NOT required / no default — new
+    // accounts (local or Google) start with no type at all, and the
+    // frontend's RoleSelector modal is what sets it post-login for
+    // consumer/prosumer, exactly once, via PATCH /auth/role.
     type: {
       type: String,
-      enum: ['consumer', 'prosumer', 'admin'],
+      enum: ['consumer', 'prosumer', 'admin', 'support'],
     },
     // On-chain wallet used for settlement payouts / trade signing.
     // Optional at signup (added once the user links a wallet), so it's
@@ -103,6 +113,19 @@ const userSchema = new mongoose.Schema(
     },
     // Know-Your-Customer verification flag — gates real-money trading/settlement.
     kycVerified: { type: Boolean, default: false },
+    // Profile page additions ----------------------------------------------
+    // Data URI (base64), not a hosted file URL — there's no file/object
+    // storage (S3, Cloudinary, etc.) wired into this project, so an
+    // uploaded avatar is resized/compressed client-side and stored inline.
+    // Fine at this size (a few KB after compression); would need real
+    // storage before this could scale to many users or larger images.
+    profilePicture: { type: String, trim: true },
+    bio: { type: String, trim: true, maxlength: 200 },
+    address: { type: String, trim: true, maxlength: 300 },
+    lastLogin: { type: Date },
+    // Set on account creation and every successful password change — lets
+    // the profile page show "Password last changed X days ago".
+    passwordChangedAt: { type: Date },
   },
   { timestamps: true } // adds createdAt / updatedAt automatically
 );
@@ -127,6 +150,7 @@ userSchema
 userSchema.pre('validate', async function hashPassword(next) {
   if (!this._plainPassword) return next();
   this.passwordHash = await bcrypt.hash(this._plainPassword, 10);
+  this.passwordChangedAt = new Date();
   this._plainPassword = undefined;
   next();
 });

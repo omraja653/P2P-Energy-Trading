@@ -8,7 +8,8 @@
 require('dotenv').config();
 const crypto = require('crypto');
 const mongoose = require('mongoose');
-const { User, MeterData, EnergyListing, Trade, Settlement } = require('../models');
+const { User, MeterData, EnergyListing, Trade, Settlement, Ticket, TicketReply } = require('../models');
+const { Counter } = require('../models/Counter');
 const { PLATFORM_FEE_RATE, GRID_WHEEL_RATE } = require('../services/settlementService');
 
 function fakeWalletAddress() {
@@ -49,6 +50,9 @@ async function main() {
     EnergyListing.deleteMany({}),
     Trade.deleteMany({}),
     Settlement.deleteMany({}),
+    Ticket.deleteMany({}),
+    TicketReply.deleteMany({}),
+    Counter.deleteMany({}), // reset ticket numbering back to TICKET-001
   ]);
 
   // --- Users ---------------------------------------------------------
@@ -70,6 +74,20 @@ async function main() {
   });
   admin.password = 'Admin1234';
   await admin.save();
+
+  const supportAgent = new User({
+    email: 'support@energytrading.com',
+    mobileNumber: '+10000000006',
+    firstName: 'Sam',
+    lastName: 'Support',
+    type: 'support',
+    kycVerified: true,
+    status: 'ACTIVE',
+    emailVerified: true,
+    mobileVerified: true,
+  });
+  supportAgent.password = 'Support1234';
+  await supportAgent.save();
 
   const alice = new User({
     email: 'alice.prosumer@example.com',
@@ -131,6 +149,7 @@ async function main() {
   await carol.save();
 
   console.log(`  ${admin.email} (admin)`);
+  console.log(`  ${supportAgent.email} (support)`);
   console.log(`  ${alice.email} / ${david.email} (prosumers)`);
   console.log(`  ${bob.email} / ${carol.email} (consumers)`);
 
@@ -232,9 +251,44 @@ async function main() {
     T1Date: new Date(tradeA.settledAt.getTime() + 24 * 60 * 60 * 1000),
   });
 
+  // --- Support tickets ----------------------------------------------------
+  console.log('Creating support tickets...');
+
+  const openTicket = await Ticket.create({
+    userId: bob._id,
+    subject: "Can't complete a purchase",
+    description: 'I click Buy on a listing and nothing happens. Tried twice, same result.',
+    category: 'Trading Issue',
+    priority: 'High',
+    status: 'Open',
+    assignedTo: supportAgent._id,
+  });
+
+  const resolvedTicket = await Ticket.create({
+    userId: carol._id,
+    subject: 'Question about the grid wheeling fee',
+    description: 'What is the grid wheeling fee on my settlement, and who receives it?',
+    category: 'Billing',
+    priority: 'Low',
+    status: 'Resolved',
+    assignedTo: supportAgent._id,
+    resolvedAt: new Date(now - 12 * 60 * 60 * 1000),
+  });
+
+  await TicketReply.create([
+    {
+      ticketId: resolvedTicket._id,
+      replyNumber: 1,
+      userId: supportAgent._id,
+      userRole: 'support',
+      message:
+        'The grid wheeling fee covers the cost of using the physical grid to deliver your energy — it goes to the grid operator, not GridMate. It\'s a fixed % of the trade total, shown in your settlement breakdown.',
+    },
+  ]);
+
   console.log('\nSeed complete:');
-  console.log('  5 users, 28 meter readings, 4 listings, 2 trades, 1 settlement');
-  console.log('\nDemo login (any user): password is "Password123" (admin: "Admin1234")');
+  console.log('  6 users, 28 meter readings, 4 listings, 2 trades, 1 settlement, 2 support tickets');
+  console.log('\nDemo login (any user): password is "Password123" (admin: "Admin1234", support: "Support1234")');
 
   await mongoose.disconnect();
 }

@@ -7,5 +7,8 @@ export function dashboardPathFor(type) {
   if (type === 'prosumer') return '/prosumer-dashboard'
   if (type === 'admin') return '/admin'
   if (type === 'consumer') return '/consumer-dashboard'
+  // Support agents have no trading dashboard of their own — their "home" is
+  // the ticket queue.
+  if (type === 'support') return '/support-dashboard'
   return null
 }

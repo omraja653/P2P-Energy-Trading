@@ -44,6 +44,44 @@ export function BarChart({ data, color = '#009687', height = 160, valueFormatter
   )
 }
 
+/** Simple line chart. `data`: [{ label, value }]. */
+export function LineChart({ data, color = '#2196f3', height = 160, valueFormatter = (v) => v }) {
+  if (!data || data.length === 0) {
+    return <p className="py-8 text-center text-sm text-slate-400">No data yet.</p>
+  }
+
+  const max = Math.max(...data.map((d) => d.value), 0.01)
+  const min = Math.min(...data.map((d) => d.value), 0)
+  const range = max - min || 1
+  const stepX = data.length > 1 ? 100 / (data.length - 1) : 0
+  const points = data.map((d, i) => {
+    const x = data.length > 1 ? i * stepX : 50
+    const y = height - 20 - ((d.value - min) / range) * (height - 20)
+    return { x, y, d }
+  })
+  const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
+
+  return (
+    <div>
+      <svg viewBox={`0 0 100 ${height}`} preserveAspectRatio="none" className="h-40 w-full overflow-visible">
+        <path d={path} fill="none" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+        {points.map((p) => (
+          <circle key={p.d.label} cx={p.x} cy={p.y} r="1.2" fill={color}>
+            <title>{`${p.d.label}: ${valueFormatter(p.d.value)}`}</title>
+          </circle>
+        ))}
+      </svg>
+      <div className="mt-1 flex text-center text-[10px] text-slate-400">
+        {data.map((d, i) => (
+          <span key={d.label} className={`truncate px-0.5 ${i % Math.ceil(data.length / 8 || 1) !== 0 ? 'invisible' : ''}`} style={{ width: `${100 / data.length}%` }}>
+            {d.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 const DONUT_COLORS = ['#009687', '#4caf50', '#2196f3', '#f59e0b', '#94a3b8']
 
 /** Donut chart. `data`: [{ label, value }]. */

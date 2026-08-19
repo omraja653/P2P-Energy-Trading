@@ -1,6 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { User } = require('../models');
+const { User, LoginEvent } = require('../models');
 const { requireAuth } = require('../middleware/auth');
 const { requireFields } = require('../middleware/validation');
 const { generateOtp, otpExpiryDate, isOtpValid } = require('../services/otpService');
@@ -17,6 +17,28 @@ const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 // number here would only surface as a confusing delivery failure later.
 const MOBILE_REGEX = /^\+[1-9]\d{7,14}$/;
 const REGISTERABLE_TYPES = ['consumer', 'prosumer']; // 'admin' isn't self-assignable
+
+// Records a real login event and bumps `lastLogin` — feeds the profile
+// page's activity timeline. Best-effort: a logging hiccup must never fail
+// the login itself.
+// Checked at every login entry point so admin suspend/block actions
+// (PATCH /api/admin/users/:id/status) actually stop the account from
+// signing in, not just flip a cosmetic flag.
+function accountAccessError(user) {
+  if (user.status === 'SUSPENDED') return 'Your account has been suspended. Contact support for details.';
+  if (user.status === 'BLOCKED') return 'Your account has been blocked.';
+  return null;
+}
+
+async function recordLogin(user, method) {
+  try {
+    user.lastLogin = new Date();
+    await user.save();
+    await LoginEvent.create({ userId: user._id, method });
+  } catch (err) {
+    console.error('Failed to record login event:', err.message);
+  }
+}
 
 // Includes the verification flags directly in the JWT (in addition to the
 // fresh copies always available in the response body / GET /me) so callers
@@ -55,6 +77,7 @@ function publicUser(user) {
     emailVerified: user.emailVerified,
     mobileVerified: user.mobileVerified,
     authProvider: user.authProvider,
+    profilePicture: user.profilePicture || null,
   };
 }
 
@@ -340,7 +363,10 @@ router.post(
       if (!user.emailVerified) {
         return res.status(403).json({ error: 'Please verify your email before logging in' });
       }
+      const accessError = accountAccessError(user);
+      if (accessError) return res.status(403).json({ error: accessError });
 
+      await recordLogin(user, 'password');
       res.json({ user: publicUser(user), token: signToken(user) });
     } catch (err) {
       next(err);
@@ -397,11 +423,14 @@ router.post('/login-email-otp', requireFields(['email', 'otp']), async (req, res
     if (!user.emailVerified) {
       return res.status(403).json({ error: 'Please verify your email before logging in' });
     }
+    const accessError = accountAccessError(user);
+    if (accessError) return res.status(403).json({ error: accessError });
 
     user.emailOtp = undefined;
     user.emailOtpExpiresAt = undefined;
     await user.save();
 
+    await recordLogin(user, 'email-otp');
     res.json({ user: publicUser(user), token: signToken(user) });
   } catch (err) {
     next(err);
@@ -418,11 +447,14 @@ router.post('/login-mobile-otp', requireFields(['mobileNumber', 'otp']), async (
     if (!user.mobileVerified) {
       return res.status(403).json({ error: 'Mobile number not verified — verify it first to use this login method' });
     }
+    const accessError = accountAccessError(user);
+    if (accessError) return res.status(403).json({ error: accessError });
 
     user.mobileOtp = undefined;
     user.mobileOtpExpiresAt = undefined;
     await user.save();
 
+    await recordLogin(user, 'mobile-otp');
     res.json({ user: publicUser(user), token: signToken(user) });
   } catch (err) {
     next(err);
@@ -535,6 +567,10 @@ router.post('/google', requireFields(['idToken']), async (req, res, next) => {
       await user.save();
     }
 
+    const accessError = accountAccessError(user);
+    if (accessError) return res.status(403).json({ error: accessError });
+
+    await recordLogin(user, 'google');
     res.json({
       user: publicUser(user),
       token: signToken(user),

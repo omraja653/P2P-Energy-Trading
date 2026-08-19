@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import api from '../services/api.js'
+import RaiseTicketModal from './RaiseTicketModal.jsx'
 
 const GREETING = {
   role: 'assistant',
@@ -77,6 +78,8 @@ function Chat() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [showTicketModal, setShowTicketModal] = useState(false)
+  const [ticketCreated, setTicketCreated] = useState(null)
   const scrollRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -89,6 +92,26 @@ function Chat() {
   function handleQuickAction(query) {
     setInput(query)
     inputRef.current?.focus()
+  }
+
+  // There's no server-side "couldn't resolve this" detection in the chat
+  // route (it's a general-purpose assistant, not a ticket triage model) —
+  // so rather than fake that signal, "Raise a Ticket" is just always
+  // available, pre-filled with the conversation so far as context.
+  function buildTicketInitial() {
+    const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user')
+    const transcript = messages
+      .filter((m) => m !== GREETING)
+      .map((m) => `${m.role === 'user' ? 'Me' : 'GridMate'}: ${m.content}`)
+      .join('\n')
+
+    return {
+      subject: lastUserMessage ? lastUserMessage.content.slice(0, 100) : 'Question from GridMate chat',
+      description: transcript || 'Raised from the GridMate chat assistant.',
+      category: 'General Inquiry',
+      chatbotInitiated: true,
+      relatedChatMessage: lastUserMessage?.content || null,
+    }
   }
 
   async function handleSend(e) {
@@ -135,6 +158,11 @@ function Chat() {
             {error && (
               <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
             )}
+            {ticketCreated && (
+              <div className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+                Ticket {ticketCreated.ticketId} created — you can track it from Support Center.
+              </div>
+            )}
           </div>
 
           <form onSubmit={handleSend} className="flex gap-2 border-t border-slate-200 p-3">
@@ -169,7 +197,28 @@ function Chat() {
               </button>
             ))}
           </div>
+
+          <div className="border-t border-slate-200 bg-slate-50 px-3 py-2">
+            <button
+              type="button"
+              onClick={() => setShowTicketModal(true)}
+              className="w-full rounded-lg border border-dashed border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-teal hover:text-teal"
+            >
+              🎫 Not resolved? Raise a Ticket
+            </button>
+          </div>
         </div>
+      )}
+
+      {showTicketModal && (
+        <RaiseTicketModal
+          initial={buildTicketInitial()}
+          onClose={() => setShowTicketModal(false)}
+          onCreated={(ticket) => {
+            setShowTicketModal(false)
+            setTicketCreated(ticket)
+          }}
+        />
       )}
 
       <button

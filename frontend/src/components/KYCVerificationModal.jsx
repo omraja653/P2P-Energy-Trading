@@ -10,13 +10,27 @@ import { dashboardPathFor } from '../utils/dashboardPath.js'
 // kycVerified: false, so this is what most people hit on Marketplace/Trade
 // History; without an escape link they'd be stuck with no way to navigate
 // anywhere else (and this overlay covers the navbar).
-function KYCVerificationModal() {
+// `onClose` is optional — omitted by VerificationGate (where this is a
+// mandatory block with no way past it but leaving the page), passed by
+// VerificationStatusCard on the profile page (where it's just an
+// informational dialog the user can dismiss).
+function KYCVerificationModal({ onClose }) {
   const { user } = useAuth()
   const backTo = dashboardPathFor(user?.type) || '/login'
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 px-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-8 text-center shadow-2xl">
+      <div className="relative w-full max-w-sm rounded-lg bg-white p-8 text-center shadow-2xl">
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        )}
         <h2 className="text-xl font-bold text-slate-900">Identity verification required</h2>
         <p className="mt-2 text-sm text-slate-500">
           KYC (Know Your Customer) verification is required before you can trade energy on GridMate.
