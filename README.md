@@ -310,7 +310,7 @@ energy-trading-platform/
 - Documentation and code cleanup
 - Quality assurance for all features
 
-**Guides:** Dr. Sumitra Motade | Dr. Krishna Kumar Saini
+**Guides:** Dr. Sumitra Motade | Dr. Vinayak Gaikwad
 
 ---
 
