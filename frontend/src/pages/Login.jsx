@@ -15,7 +15,7 @@ const HERO_IMAGE = '/loginpage.png'
 
 function BrandMark() {
   return (
-    <div className="flex flex-col items-start">
+    <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
       <div className="flex items-center gap-2.5">
         <svg viewBox="0 0 64 64" className="h-9 w-9 shrink-0" aria-hidden="true">
           <ellipse
@@ -254,11 +254,11 @@ function Login() {
         </div>
       </aside>
 
-      <div className="flex h-[32vh] w-full lg:h-full lg:w-[65%]">
+      <div className="hidden lg:flex lg:h-full lg:w-[65%]">
         <img
           src={HERO_IMAGE}
           alt="Renewable energy community"
-          className="h-full w-full object-contain object-center bg-[#eaf3f0] lg:object-cover"
+          className="h-full w-full object-cover object-center"
         />
       </div>
 

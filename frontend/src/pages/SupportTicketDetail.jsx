@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth.js'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import { TicketStatusBadge, PriorityBadge } from '../components/TicketBadges.jsx'
 import { formatDateTime, TICKET_STATUSES } from '../utils/formatting.js'
 import { fetchTicket, fetchTicketReplies, addAgentReply, assignTicketToMe, setTicketStatus } from '../services/support.js'
+import { connectAndJoin, disconnectSocket, getSocket } from '../services/socket.js'
 
 function ReplyBubble({ reply }) {
   const isSupport = reply.userRole === 'support'
@@ -25,6 +27,7 @@ function ReplyBubble({ reply }) {
 
 function SupportTicketDetail() {
   const { ticketId } = useParams()
+  const { user } = useAuth()
   const [ticket, setTicket] = useState(null)
   const [replies, setReplies] = useState([])
   const [loading, setLoading] = useState(true)
@@ -51,6 +54,44 @@ function SupportTicketDetail() {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId])
+
+  // Live: a customer's reply on this ticket appears instantly (targeted at
+  // this ticket's assigned agent — see ticketService.addTicketReply), and a
+  // status/priority/assignment change made by another agent updates this
+  // view too (the broadcast every agent dashboard already listens for,
+  // filtered here to just this ticket).
+  useEffect(() => {
+    if (!user?.id) return
+    connectAndJoin(user.id)
+    const socket = getSocket()
+
+    function onReplyAdded(payload) {
+      if (payload.ticketId !== ticketId) return
+      setReplies((prev) => (prev.some((r) => r._id === payload.reply._id) ? prev : [...prev, payload.reply]))
+    }
+
+    function onTicketUpdated(payload) {
+      if (payload.ticketId !== ticketId) return
+      setTicket((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: payload.status ?? prev.status,
+              priority: payload.priority ?? prev.priority,
+              updatedAt: payload.updatedAt ?? prev.updatedAt,
+            }
+          : prev
+      )
+    }
+
+    socket.on('ticket-reply-added', onReplyAdded)
+    socket.on('ticket-updated', onTicketUpdated)
+    return () => {
+      socket.off('ticket-reply-added', onReplyAdded)
+      socket.off('ticket-updated', onTicketUpdated)
+      disconnectSocket()
+    }
+  }, [ticketId, user?.id])
 
   async function handleReply(e) {
     e.preventDefault()

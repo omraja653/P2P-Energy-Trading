@@ -13,7 +13,7 @@ function EnergyListings() {
       {(listings || []).map((listing) => (
         <div key={listing._id} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <p className="font-medium">{listing.quantityKWh} kWh available</p>
-          <p className="text-sm text-gray-600">${listing.pricePerKwh} / kWh</p>
+          <p className="text-sm text-gray-600">₹{listing.pricePerKwh} / kWh</p>
         </div>
       ))}
     </div>

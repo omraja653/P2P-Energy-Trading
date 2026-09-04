@@ -9,7 +9,7 @@ const GREETING = {
 }
 
 const QUICK_ACTIONS = [
-  { label: 'Price Alerts', query: 'Alert me when the P2P price drops below $0.10/kWh.' },
+  { label: 'Price Alerts', query: 'Alert me when the P2P price drops below ₹0.10/kWh.' },
   { label: 'My Trades', query: 'What are my pending trades right now?' },
   { label: 'Nearby Prosumers', query: 'Who has energy available to buy right now?' },
   { label: 'Savings Calculator', query: 'How much have I saved compared to grid prices this month?' },

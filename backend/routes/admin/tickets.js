@@ -2,6 +2,7 @@ const express = require('express');
 const { Ticket } = require('../../models');
 const ticketService = require('../../services/ticketService');
 const adminLogService = require('../../services/adminLogService');
+const socketService = require('../../services/socket');
 
 const router = express.Router();
 const { PRIORITIES, STATUSES } = Ticket;
@@ -52,6 +53,15 @@ router.patch('/:id/priority', async (req, res, next) => {
     const ticket = await Ticket.findByIdAndUpdate(req.params.id, { priority }, { new: true });
     if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
     await adminLogService.logAction(req.user.id, 'ticket.priority', 'ticket', ticket._id, `Set to ${priority}`);
+    // Priority-only change bypasses ticketService (this is the one mutation
+    // that doesn't go through it), so it needs its own broadcast to keep
+    // agent dashboards' Priority column live.
+    socketService.emitTicketUpdated({
+      ticketId: String(ticket._id),
+      ticketNumber: ticket.ticketId,
+      priority: ticket.priority,
+      updatedAt: ticket.updatedAt,
+    });
     res.json(ticket);
   } catch (err) {
     next(err);

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import AdminNav from '../components/AdminNav.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import KycDetailModal from '../components/KycDetailModal.jsx'
 import Toast from '../components/Toast.jsx'
@@ -39,7 +38,6 @@ function AdminKyc() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#f5f5f5]">
-      <AdminNav />
       <div className="mx-auto max-w-6xl p-6 md:p-8">
         <h1 className="text-2xl font-bold text-slate-900">KYC Management</h1>
         <p className="mt-1 text-sm text-slate-500">

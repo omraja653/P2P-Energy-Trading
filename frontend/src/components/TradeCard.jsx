@@ -7,7 +7,7 @@ function TradeCard({ trade }) {
         <span className="font-medium">{trade.quantityKWh} kWh</span>
         <span className="text-sm text-gray-500">{trade.status}</span>
       </div>
-      <p className="mt-1 text-sm text-gray-600">Price: ${trade.pricePerKwh}/kWh</p>
+      <p className="mt-1 text-sm text-gray-600">Price: ₹{trade.pricePerKwh}/kWh</p>
       {trade.blockchainTxHash && <p className="mt-1 text-xs text-gray-400">Tx: {trade.blockchainTxHash}</p>}
     </div>
   )

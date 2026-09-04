@@ -3,8 +3,8 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 import VerificationGate from './components/VerificationGate.jsx'
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
-import ConsumerDashboard from './pages/ConsumerDashboard.jsx'
-import ProsumerDashboard from './pages/ProsumerDashboard.jsx'
+import Dashboard from './pages/Dashboard.jsx'
+import Wallet from './pages/Wallet.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
 import AdminUsers from './pages/AdminUsers.jsx'
 import AdminKyc from './pages/AdminKyc.jsx'
@@ -20,6 +20,10 @@ import TicketDetail from './pages/TicketDetail.jsx'
 import SupportDashboard from './pages/SupportDashboard.jsx'
 import SupportTicketDetail from './pages/SupportTicketDetail.jsx'
 import UserProfile from './pages/UserProfile.jsx'
+import ForecastDashboard from './pages/ForecastDashboard.jsx'
+import SlotTrading from './pages/SlotTrading.jsx'
+import Bid from './pages/Bid.jsx'
+import RevenueManagement from './pages/RevenueManagement.jsx'
 import NotFound from './pages/NotFound.jsx'
 import { useAuth } from './hooks/useAuth.js'
 import { dashboardPathFor } from './utils/dashboardPath.js'
@@ -53,6 +57,16 @@ function RequireAdmin({ children }) {
   return children
 }
 
+// Forecast/slots/revenue are trading features — the backend already 403s
+// admin/support on all three, this just avoids showing them an error page.
+function RequireTrader({ children }) {
+  const { user } = useAuth()
+  if (user?.type !== 'consumer' && user?.type !== 'prosumer') {
+    return <Navigate to={dashboardPathFor(user?.type) || '/login'} replace />
+  }
+  return children
+}
+
 function App() {
   return (
     <Routes>
@@ -61,8 +75,22 @@ function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<HomeRedirect />} />
-        <Route path="/consumer-dashboard" element={<ConsumerDashboard />} />
-        <Route path="/prosumer-dashboard" element={<ProsumerDashboard />} />
+        <Route
+          path="/dashboard"
+          element={
+            <RequireTrader>
+              <Dashboard />
+            </RequireTrader>
+          }
+        />
+        <Route
+          path="/wallet"
+          element={
+            <RequireTrader>
+              <Wallet />
+            </RequireTrader>
+          }
+        />
         <Route path="/admin" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
         <Route path="/admin/users" element={<RequireAdmin><AdminUsers /></RequireAdmin>} />
         <Route path="/admin/kyc" element={<RequireAdmin><AdminKyc /></RequireAdmin>} />
@@ -87,7 +115,48 @@ function App() {
             </VerificationGate>
           }
         />
+        {/* /orders is the same real page as /trade-history (linked from the
+            Navbar as "Orders" already) — an alias, not a second Orders
+            page, so there's one implementation to keep in sync rather than
+            two that drift apart. */}
+        <Route path="/orders" element={<Navigate to="/trade-history" replace />} />
         <Route path="/profile" element={<UserProfile />} />
+        <Route
+          path="/forecast"
+          element={
+            <RequireTrader>
+              <ForecastDashboard />
+            </RequireTrader>
+          }
+        />
+        <Route
+          path="/slots"
+          element={
+            <RequireTrader>
+              <VerificationGate>
+                <SlotTrading />
+              </VerificationGate>
+            </RequireTrader>
+          }
+        />
+        <Route
+          path="/revenue"
+          element={
+            <RequireTrader>
+              <RevenueManagement />
+            </RequireTrader>
+          }
+        />
+        <Route
+          path="/bid"
+          element={
+            <RequireTrader>
+              <VerificationGate>
+                <Bid />
+              </VerificationGate>
+            </RequireTrader>
+          }
+        />
         <Route path="/support" element={<SupportCenter />} />
         <Route path="/support/tickets/:ticketId" element={<TicketDetail />} />
         <Route

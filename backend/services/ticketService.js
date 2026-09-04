@@ -1,5 +1,6 @@
 const { Ticket, TicketReply, User } = require('../models');
 const { sendTicketNotification } = require('./emailService');
+const socketService = require('./socket');
 
 const POPULATE_USER = 'firstName lastName email type';
 
@@ -41,6 +42,12 @@ async function createTicket(userId, { subject, description, category, priority, 
       body: `${ticket.ticketId} — "${subject}" (${priority || 'Medium'} priority, ${category}).`,
     });
   }
+
+  // Every connected support/admin dashboard sees this land instantly — real
+  // ticket fields only (no fabricated "userName" field; the frontend reads
+  // it off the populated userId, same as every other ticket view already does).
+  const populated = await Ticket.findById(ticket._id).populate('userId', POPULATE_USER).populate('assignedTo', POPULATE_USER);
+  socketService.emitNewSupportTicket(populated);
 
   return ticket;
 }
@@ -87,6 +94,24 @@ async function updateTicketStatus(ticketId, status) {
     });
   }
 
+  // Targeted: the ticket's owner sees their status change live wherever
+  // they're looking at it (Support Center list or the ticket detail page).
+  // A customer can trigger this too (closing their own Resolved ticket),
+  // so this isn't agent-only.
+  socketService.emitTicketStatusChanged([ticket.userId?._id || ticket.userId], {
+    ticketId: String(ticket._id),
+    ticketNumber: ticket.ticketId,
+    newStatus: ticket.status,
+    updatedAt: ticket.updatedAt,
+  });
+  // Broadcast: every agent dashboard's ticket list row updates in place.
+  socketService.emitTicketUpdated({
+    ticketId: String(ticket._id),
+    ticketNumber: ticket.ticketId,
+    status: ticket.status,
+    updatedAt: ticket.updatedAt,
+  });
+
   return ticket;
 }
 
@@ -107,21 +132,43 @@ async function assignTicket(ticketId, agentId) {
     });
   }
 
-  return Ticket.findById(ticketId).populate('userId', POPULATE_USER).populate('assignedTo', POPULATE_USER);
+  const populated = await Ticket.findById(ticketId).populate('userId', POPULATE_USER).populate('assignedTo', POPULATE_USER);
+
+  // Broadcast so other agents' dashboards immediately show this ticket as
+  // no longer unassigned/assigned to someone else — avoids two agents both
+  // thinking they should pick it up.
+  socketService.emitTicketUpdated({
+    ticketId: String(populated._id),
+    ticketNumber: populated.ticketId,
+    status: populated.status,
+    assignedTo: populated.assignedTo,
+    updatedAt: populated.updatedAt,
+  });
+
+  return populated;
 }
 
 async function addTicketReply(ticketId, userId, userRole, message) {
   const replyNumber = (await TicketReply.countDocuments({ ticketId })) + 1;
-  const reply = await TicketReply.create({ ticketId, userId, userRole, message, replyNumber });
+  let reply = await TicketReply.create({ ticketId, userId, userRole, message, replyNumber });
+  reply = await reply.populate('userId', POPULATE_USER);
 
   const ticket = await Ticket.findById(ticketId).populate('userId', POPULATE_USER).populate('assignedTo', POPULATE_USER);
   if (ticket) {
     // A support reply on an Open ticket implicitly moves it to In Progress —
     // small quality-of-life touch so "Open" accurately means "nobody's
-    // looked at this yet".
+    // looked at this yet". Emits the same ticket-status-changed the
+    // explicit status route does, so the customer's badge updates live for
+    // this implicit transition too, not just explicit agent status changes.
     if (userRole === 'support' && ticket.status === 'Open') {
       ticket.status = 'In Progress';
       await ticket.save();
+      socketService.emitTicketStatusChanged([ticket.userId?._id || ticket.userId], {
+        ticketId: String(ticket._id),
+        ticketNumber: ticket.ticketId,
+        newStatus: ticket.status,
+        updatedAt: ticket.updatedAt,
+      });
     }
 
     const notifyTarget = userRole === 'support' ? ticket.userId : ticket.assignedTo;
@@ -133,9 +180,29 @@ async function addTicketReply(ticketId, userId, userRole, message) {
         body: message.length > 200 ? `${message.slice(0, 200)}...` : message,
       });
     }
+
+    // Live: the other side of the thread — whoever didn't just post — sees
+    // the reply appear without reloading the ticket detail page. Also
+    // broadcast ticket-updated so an agent dashboard's "Last Updated"
+    // column (and, if this was the implicit Open -> In Progress move
+    // above, its Status column) refreshes without a refetch.
+    const targetId = notifyTarget?._id || notifyTarget;
+    if (targetId) {
+      socketService.emitTicketReplyAdded([targetId], {
+        ticketId: String(ticket._id),
+        ticketNumber: ticket.ticketId,
+        reply: reply.toObject ? reply.toObject() : reply,
+      });
+    }
+    socketService.emitTicketUpdated({
+      ticketId: String(ticket._id),
+      ticketNumber: ticket.ticketId,
+      status: ticket.status,
+      updatedAt: ticket.updatedAt,
+    });
   }
 
-  return reply.populate('userId', POPULATE_USER);
+  return reply;
 }
 
 async function getTicketReplies(ticketId) {

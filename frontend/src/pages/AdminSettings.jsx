@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import AdminNav from '../components/AdminNav.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Toast from '../components/Toast.jsx'
 import { fetchSystemSettings, updateSystemSettings } from '../services/admin.js'
@@ -52,7 +51,6 @@ function AdminSettings() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#f5f5f5]">
-      <AdminNav />
       <div className="mx-auto max-w-2xl p-6 md:p-8">
         <h1 className="text-2xl font-bold text-slate-900">Platform Settings</h1>
 

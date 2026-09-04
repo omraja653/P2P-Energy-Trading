@@ -1,9 +1,11 @@
 require('dotenv').config();
+const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
+const socketService = require('./services/socket');
 
 const app = express();
 
@@ -35,9 +37,16 @@ if (MONGODB_URI) {
   console.log('MONGODB_URI not set — skipping database connection');
 }
 
+// Socket.io needs a raw http.Server to attach to (not the Express app
+// directly) — app itself is still exported unchanged below, so
+// require('./server') in tests keeps working exactly as before (supertest
+// wraps the Express app in its own ephemeral server per request).
+const httpServer = http.createServer(app);
+socketService.init(httpServer);
+
 // Start server
 if (require.main === module) {
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }

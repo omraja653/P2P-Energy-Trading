@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import AdminNav from '../components/AdminNav.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import { formatCurrency, formatKwh } from '../utils/formatting.js'
 import { fetchRevenueReport, fetchComplianceReport, fetchDisputesReport, downloadRevenueCsv } from '../services/admin.js'
@@ -49,7 +48,6 @@ function AdminReports() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#f5f5f5]">
-      <AdminNav />
       <div className="mx-auto max-w-6xl p-6 md:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold text-slate-900">Reports</h1>

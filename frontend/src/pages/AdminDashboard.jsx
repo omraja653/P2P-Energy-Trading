@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import AdminNav from '../components/AdminNav.jsx'
 import MetricsCard from '../components/MetricsCard.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import { BarChart, DonutChart, LineChart } from '../components/charts.jsx'
@@ -65,7 +64,6 @@ function AdminDashboard() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#f5f5f5]">
-      <AdminNav />
       <div className="mx-auto max-w-7xl p-6 md:p-8">
         <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
         <p className="text-slate-500">Platform-wide metrics and management.</p>

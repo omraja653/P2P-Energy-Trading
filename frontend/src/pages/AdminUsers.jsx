@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import AdminNav from '../components/AdminNav.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import ConfirmModal from '../components/ConfirmModal.jsx'
 import UserDetailModal from '../components/UserDetailModal.jsx'
@@ -89,7 +88,6 @@ function AdminUsers() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#f5f5f5]">
-      <AdminNav />
       <div className="mx-auto max-w-7xl p-6 md:p-8">
         <h1 className="text-2xl font-bold text-slate-900">User Management</h1>
 

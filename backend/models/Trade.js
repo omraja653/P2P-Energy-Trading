@@ -15,11 +15,14 @@ const tradeSchema = new mongoose.Schema(
         message: 'quantityKWh must be greater than 0',
       },
     },
+    // No upper/lower band on the trade's own price — bids (services/slotMatchingService.js)
+    // no longer enforce one either, so a matched executedPrice outside the
+    // old ₹0.08-₹0.20 band must still be storable here. EnergyListing (the
+    // Marketplace listing side) keeps its own band independently.
     pricePerKwh: {
       type: Number,
       required: true,
-      min: [0.08, 'pricePerKwh must be at least $0.08'],
-      max: [0.2, 'pricePerKwh must be at most $0.20'],
+      validate: { validator: (v) => v > 0, message: 'pricePerKwh must be greater than 0' },
     },
     // quantityKWh * pricePerKwh, snapshotted at match time.
     totalAmount: {

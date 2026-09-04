@@ -1,5 +1,5 @@
-export const formatCurrency = (num) => `$${Number(num ?? 0).toFixed(2)}`
-export const formatCurrency3 = (num) => `$${Number(num ?? 0).toFixed(3)}`
+export const formatCurrency = (num) => `₹${Number(num ?? 0).toFixed(2)}`
+export const formatCurrency3 = (num) => `₹${Number(num ?? 0).toFixed(3)}`
 export const formatKwh = (num) => `${Number(num ?? 0).toFixed(2)} kWh`
 export const formatKw = (num) => `${Number(num ?? 0).toFixed(2)} kW`
 export const formatDate = (date) => (date ? new Date(date).toLocaleDateString() : '—')
@@ -7,6 +7,7 @@ export const formatTime = (date) => (date ? new Date(date).toLocaleTimeString() 
 export const formatDateTime = (date) => (date ? new Date(date).toLocaleString() : '—')
 
 export const STATUS_STYLES = {
+  pending: { label: 'Pending', icon: '●', className: 'bg-yellow-100 text-yellow-700' },
   matched: { label: 'Matched', icon: '⏳', className: 'bg-yellow-100 text-yellow-700' },
   verified: { label: 'Verified', icon: '⏳', className: 'bg-blue-100 text-blue-700' },
   settled: { label: 'Settled', icon: '✓', className: 'bg-green-100 text-green-700' },

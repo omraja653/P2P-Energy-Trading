@@ -4,9 +4,10 @@
 // that's where the "authenticated but no role yet" case is handled by
 // showing RoleSelector instead of the login form.
 export function dashboardPathFor(type) {
-  if (type === 'prosumer') return '/prosumer-dashboard'
+  // Consumer and prosumer now share one unified Dashboard page (branches on
+  // role internally) instead of two separate routes/pages.
+  if (type === 'prosumer' || type === 'consumer') return '/dashboard'
   if (type === 'admin') return '/admin'
-  if (type === 'consumer') return '/consumer-dashboard'
   // Support agents have no trading dashboard of their own — their "home" is
   // the ticket queue.
   if (type === 'support') return '/support-dashboard'

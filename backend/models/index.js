@@ -9,6 +9,10 @@ const LoginEvent = require('./LoginEvent');
 const AdminLog = require('./AdminLog');
 const SystemSettings = require('./SystemSettings');
 const Announcement = require('./Announcement');
+const ForecastData = require('./ForecastData');
+const TradingSlot = require('./TradingSlot');
+const TradeNotification = require('./TradeNotification');
+const Transaction = require('./Transaction');
 
 module.exports = {
   User,
@@ -22,4 +26,8 @@ module.exports = {
   AdminLog,
   SystemSettings,
   Announcement,
+  ForecastData,
+  TradingSlot,
+  TradeNotification,
+  Transaction,
 };

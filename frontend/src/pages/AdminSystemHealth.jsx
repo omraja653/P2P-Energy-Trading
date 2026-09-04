@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import AdminNav from '../components/AdminNav.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import Toast from '../components/Toast.jsx'
 import { formatDateTime } from '../utils/formatting.js'
@@ -64,7 +63,6 @@ function AdminSystemHealth() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#f5f5f5]">
-      <AdminNav />
       <div className="mx-auto max-w-5xl p-6 md:p-8">
         <h1 className="text-2xl font-bold text-slate-900">System Health</h1>
 

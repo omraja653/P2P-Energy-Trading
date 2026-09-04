@@ -57,15 +57,15 @@ async function buildMarketContext() {
   const listingLines = sample
     .map((l) => {
       const name = l.prosumerId?.firstName || 'A prosumer';
-      return `- ${name}: ${l.quantityKWh} kWh at $${l.pricePerKwh}/kWh (${l.tradingType})`;
+      return `- ${name}: ${l.quantityKWh} kWh at ₹${l.pricePerKwh}/kWh (${l.tradingType})`;
     })
     .join('\n');
 
   return [
     'Live market data:',
     `- Active listings: ${count}, totaling ${totalKWh.toFixed(2)} kWh available`,
-    `- P2P price range: $${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)} per kWh (avg $${avgPrice.toFixed(2)})`,
-    `- Grid retail price for comparison: $${GRID_PRICE_PER_KWH.toFixed(2)}/kWh`,
+    `- P2P price range: ₹${minPrice.toFixed(2)} - ₹${maxPrice.toFixed(2)} per kWh (avg ₹${avgPrice.toFixed(2)})`,
+    `- Grid retail price for comparison: ₹${GRID_PRICE_PER_KWH.toFixed(2)}/kWh`,
     'Nearby prosumers currently selling:',
     listingLines || '(none listed at the moment)',
   ].join('\n');
@@ -89,7 +89,7 @@ async function buildUserContext(user) {
   const pendingLines = pendingTrades
     .map((t) => {
       const role = String(t.buyerId) === String(userId) ? 'Buying' : 'Selling';
-      return `- ${role} ${t.quantityKWh} kWh @ $${t.pricePerKwh}/kWh ($${t.totalAmount.toFixed(2)} total) — status: ${t.status}`;
+      return `- ${role} ${t.quantityKWh} kWh @ ₹${t.pricePerKwh}/kWh (₹${t.totalAmount.toFixed(2)} total) — status: ${t.status}`;
     })
     .join('\n');
 
@@ -108,11 +108,11 @@ async function buildUserContext(user) {
   if (isProsumer) {
     const earned = monthTrades.reduce((sum, t) => sum + t.totalAmount, 0);
     const buybackEquivalent = monthTrades.reduce((sum, t) => sum + t.quantityKWh * GRID_BUYBACK_PER_KWH, 0);
-    savingsLine = `This month: earned $${earned.toFixed(2)} from P2P sales, vs an estimated $${buybackEquivalent.toFixed(2)} if sold back to the grid at $${GRID_BUYBACK_PER_KWH}/kWh — $${(earned - buybackEquivalent).toFixed(2)} more.`;
+    savingsLine = `This month: earned ₹${earned.toFixed(2)} from P2P sales, vs an estimated ₹${buybackEquivalent.toFixed(2)} if sold back to the grid at ₹${GRID_BUYBACK_PER_KWH}/kWh — ₹${(earned - buybackEquivalent).toFixed(2)} more.`;
   } else {
     const paid = monthTrades.reduce((sum, t) => sum + t.totalAmount, 0);
     const gridEquivalent = monthTrades.reduce((sum, t) => sum + t.quantityKWh * GRID_PRICE_PER_KWH, 0);
-    savingsLine = `This month: paid $${paid.toFixed(2)} for P2P energy, vs an estimated $${gridEquivalent.toFixed(2)} at the grid retail price of $${GRID_PRICE_PER_KWH}/kWh — $${(gridEquivalent - paid).toFixed(2)} saved.`;
+    savingsLine = `This month: paid ₹${paid.toFixed(2)} for P2P energy, vs an estimated ₹${gridEquivalent.toFixed(2)} at the grid retail price of ₹${GRID_PRICE_PER_KWH}/kWh — ₹${(gridEquivalent - paid).toFixed(2)} saved.`;
   }
 
   return [
@@ -132,7 +132,7 @@ How the platform works, for context:
 - Settlement can also be recorded on the Polygon blockchain for transparency.
 
 How to handle common requests:
-- Price alerts ("alert me below $X/kWh"): confirm the threshold back clearly and compare it to today's live price. Be upfront that this chat doesn't send push notifications — the alert is only noted for this conversation, not saved as a background job.
+- Price alerts ("alert me below ₹X/kWh"): confirm the threshold back clearly and compare it to today's live price. Be upfront that this chat doesn't send push notifications — the alert is only noted for this conversation, not saved as a background job.
 - "My trades" / trade status: answer from the "pending trades" data below, which is real and specific to this user. If it's empty, say so plainly rather than inventing a trade.
 - "Nearby prosumers": this platform has no location/distance data yet, so treat "nearby" as "currently active platform-wide" and list from the live market data below. If the user specifically asks about distance or location, say that isn't supported yet.
 - Savings / earnings: use the "this month" figure below — it's a real calculation from their trade history, not an estimate you invent.

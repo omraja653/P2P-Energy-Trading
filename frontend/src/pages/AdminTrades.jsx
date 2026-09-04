@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import AdminNav from '../components/AdminNav.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import StatusBadge from '../components/StatusBadge.jsx'
 import TradeDetailModal from '../components/TradeDetailModal.jsx'
@@ -42,7 +41,6 @@ function AdminTrades() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#f5f5f5]">
-      <AdminNav />
       <div className="mx-auto max-w-6xl p-6 md:p-8">
         <h1 className="text-2xl font-bold text-slate-900">Trade Management</h1>
 

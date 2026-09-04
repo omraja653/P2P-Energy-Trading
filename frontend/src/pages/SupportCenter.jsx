@@ -1,15 +1,38 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth.js'
 import { useFetch } from '../hooks/useFetch.js'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import RaiseTicketModal from '../components/RaiseTicketModal.jsx'
 import { TicketStatusBadge, PriorityBadge } from '../components/TicketBadges.jsx'
 import { formatDateTime } from '../utils/formatting.js'
+import { connectAndJoin, disconnectSocket, getSocket } from '../services/socket.js'
 
 function SupportCenter() {
+  const { user } = useAuth()
   const tickets = useFetch('/support/tickets')
   const [showModal, setShowModal] = useState(false)
   const [justCreated, setJustCreated] = useState(null)
+  // Live status patches layered on top of useFetch's read-only data — keyed
+  // by ticket id so a 'ticket-status-changed' push updates the row in place
+  // without needing a refetch (useFetch has no manual refetch hook).
+  const [liveStatus, setLiveStatus] = useState({})
+
+  useEffect(() => {
+    if (!user?.id) return
+    connectAndJoin(user.id)
+    const socket = getSocket()
+
+    function onStatusChanged(payload) {
+      setLiveStatus((prev) => ({ ...prev, [payload.ticketId]: payload }))
+    }
+
+    socket.on('ticket-status-changed', onStatusChanged)
+    return () => {
+      socket.off('ticket-status-changed', onStatusChanged)
+      disconnectSocket()
+    }
+  }, [user?.id])
 
   function handleCreated(ticket) {
     setShowModal(false)
@@ -63,20 +86,25 @@ function SupportCenter() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {tickets.data.map((t) => (
-                  <tr key={t._id} className="cursor-pointer transition hover:bg-slate-50">
-                    <td className="px-4 py-2.5">
-                      <Link to={`/support/tickets/${t._id}`} className="font-medium text-brand-blue hover:underline">
-                        {t.ticketId}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-700">{t.subject}</td>
-                    <td className="px-4 py-2.5"><TicketStatusBadge status={t.status} /></td>
-                    <td className="px-4 py-2.5"><PriorityBadge priority={t.priority} /></td>
-                    <td className="px-4 py-2.5 text-slate-500">{formatDateTime(t.createdAt)}</td>
-                    <td className="px-4 py-2.5 text-slate-500">{formatDateTime(t.updatedAt)}</td>
-                  </tr>
-                ))}
+                {tickets.data.map((t) => {
+                  const live = liveStatus[t._id]
+                  const status = live?.newStatus || t.status
+                  const updatedAt = live?.updatedAt || t.updatedAt
+                  return (
+                    <tr key={t._id} className="cursor-pointer transition hover:bg-slate-50">
+                      <td className="px-4 py-2.5">
+                        <Link to={`/support/tickets/${t._id}`} className="font-medium text-brand-blue hover:underline">
+                          {t.ticketId}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-700">{t.subject}</td>
+                      <td className="px-4 py-2.5"><TicketStatusBadge status={status} /></td>
+                      <td className="px-4 py-2.5"><PriorityBadge priority={t.priority} /></td>
+                      <td className="px-4 py-2.5 text-slate-500">{formatDateTime(t.createdAt)}</td>
+                      <td className="px-4 py-2.5 text-slate-500">{formatDateTime(updatedAt)}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}

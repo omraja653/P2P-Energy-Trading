@@ -7,6 +7,7 @@ import { TicketStatusBadge, PriorityBadge } from '../components/TicketBadges.jsx
 import { ListIcon, CashIcon, ReceiptIcon } from '../components/icons.jsx'
 import { formatDateTime, TICKET_STATUSES, TICKET_PRIORITIES, TICKET_CATEGORIES } from '../utils/formatting.js'
 import { fetchAgentTickets, fetchDashboardMetrics } from '../services/support.js'
+import { getSocket, disconnectSocket } from '../services/socket.js'
 
 function personName(person) {
   if (!person || typeof person !== 'object') return 'Unassigned'
@@ -25,6 +26,7 @@ function SupportDashboard() {
   const [category, setCategory] = useState('')
   const [mineOnly, setMineOnly] = useState(false)
   const [search, setSearch] = useState('')
+  const [toast, setToast] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -54,11 +56,57 @@ function SupportDashboard() {
     load()
   }, [load])
 
+  // Real-time: a new ticket or any status/priority/assignment change
+  // re-runs the same filtered query `load()` already does — that keeps the
+  // list correct against whatever filters are active (a hand-rolled
+  // prepend/patch would need to duplicate that filter logic and could
+  // drift from it), while still being push-driven, not a timer. No
+  // setInterval, no refresh button.
+  useEffect(() => {
+    const socket = getSocket()
+    socket.connect()
+
+    function onNewTicket(ticket) {
+      const name = ticket.userId ? `${ticket.userId.firstName || ''} ${ticket.userId.lastName || ''}`.trim() : 'a customer'
+      setToast(`New ticket from ${name}: ${ticket.subject}`)
+      load()
+    }
+
+    function onTicketUpdated() {
+      load()
+    }
+
+    socket.on('new-support-ticket', onNewTicket)
+    socket.on('ticket-updated', onTicketUpdated)
+
+    return () => {
+      socket.off('new-support-ticket', onNewTicket)
+      socket.off('ticket-updated', onTicketUpdated)
+      disconnectSocket()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load])
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 5000)
+    return () => clearTimeout(timer)
+  }, [toast])
+
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#f5f5f5]">
       <div className="mx-auto max-w-6xl p-6 md:p-8">
         <h1 className="text-2xl font-bold text-slate-900">Support Dashboard</h1>
         <p className="text-slate-500">Ticket queue and response metrics.</p>
+
+        {toast && (
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-teal/30 bg-teal/10 px-4 py-2.5 text-sm text-slate-700">
+            <span>🔔 {toast}</span>
+            <button type="button" onClick={() => setToast(null)} className="shrink-0 text-slate-400 hover:text-slate-600" aria-label="Dismiss">
+              ✕
+            </button>
+          </div>
+        )}
 
         {loading && !metrics ? (
           <div className="mt-6"><LoadingSpinner /></div>

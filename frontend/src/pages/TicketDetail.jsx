@@ -5,6 +5,7 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import { TicketStatusBadge, PriorityBadge } from '../components/TicketBadges.jsx'
 import { formatDateTime } from '../utils/formatting.js'
 import { fetchTicket, fetchTicketReplies, addReply, closeTicket } from '../services/support.js'
+import { connectAndJoin, disconnectSocket, getSocket } from '../services/socket.js'
 
 function ReplyBubble({ reply }) {
   const isCustomer = reply.userRole === 'customer'
@@ -53,6 +54,35 @@ function TicketDetail() {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId])
+
+  // Live: an agent's status change or reply on THIS ticket shows up here
+  // instantly — no refresh needed. Both events are targeted at this
+  // ticket's owner (see ticketService.js), so joining our own user room is
+  // enough; no need to filter by "is this ticket mine" beyond matching
+  // ticketId, since only events for ticket owner reach us at all.
+  useEffect(() => {
+    if (!user?.id) return
+    connectAndJoin(user.id)
+    const socket = getSocket()
+
+    function onStatusChanged(payload) {
+      if (payload.ticketId !== ticketId) return
+      setTicket((prev) => (prev ? { ...prev, status: payload.newStatus, updatedAt: payload.updatedAt } : prev))
+    }
+
+    function onReplyAdded(payload) {
+      if (payload.ticketId !== ticketId) return
+      setReplies((prev) => (prev.some((r) => r._id === payload.reply._id) ? prev : [...prev, payload.reply]))
+    }
+
+    socket.on('ticket-status-changed', onStatusChanged)
+    socket.on('ticket-reply-added', onReplyAdded)
+    return () => {
+      socket.off('ticket-status-changed', onStatusChanged)
+      socket.off('ticket-reply-added', onReplyAdded)
+      disconnectSocket()
+    }
+  }, [ticketId, user?.id])
 
   async function handleReply(e) {
     e.preventDefault()

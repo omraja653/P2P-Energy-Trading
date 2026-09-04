@@ -17,6 +17,7 @@ function ListingCard({ listing, currentUserId, onBuy, buying, gridPrice }) {
     : 'Unknown'
   const isOwnListing = listing.prosumerId?._id === currentUserId
   const beatsGrid = typeof gridPrice === 'number' && listing.pricePerKwh < gridPrice
+  const savingsVsGrid = beatsGrid ? (gridPrice - listing.pricePerKwh) * listing.quantityKWh : null
 
   return (
     <div className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-lg">
@@ -52,6 +53,9 @@ function ListingCard({ listing, currentUserId, onBuy, buying, gridPrice }) {
         <p className="mt-2 text-xs font-medium uppercase tracking-wide text-brand-blue">
           {TRADING_TYPE_LABELS[listing.tradingType] || listing.tradingType}
         </p>
+        {savingsVsGrid != null && (
+          <p className="mt-1 text-xs font-medium text-brand-green">Savings vs grid: {formatCurrency(savingsVsGrid)}</p>
+        )}
 
         {showDetails && (
           <div className="mt-3 rounded bg-slate-50 p-3 text-xs text-slate-500">
@@ -62,11 +66,11 @@ function ListingCard({ listing, currentUserId, onBuy, buying, gridPrice }) {
         )}
       </div>
 
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
         <button
           type="button"
           onClick={() => setShowDetails((v) => !v)}
-          className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          className="min-h-[44px] flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 sm:min-h-0"
         >
           {showDetails ? 'Hide' : 'View Details'}
         </button>
@@ -75,9 +79,9 @@ function ListingCard({ listing, currentUserId, onBuy, buying, gridPrice }) {
           onClick={() => onBuy?.(listing)}
           disabled={buying || isOwnListing}
           title={isOwnListing ? "You can't buy your own listing" : undefined}
-          className="flex-1 rounded-lg bg-brand-green px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+          className="min-h-[44px] flex-1 rounded-lg bg-brand-green px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50 sm:min-h-0"
         >
-          {buying ? 'Buying...' : isOwnListing ? 'Your listing' : `Buy ${formatKwh(listing.quantityKWh)}`}
+          {buying ? 'Buying...' : isOwnListing ? 'Your listing' : 'Buy Now'}
         </button>
       </div>
     </div>

@@ -2,6 +2,7 @@ const express = require('express');
 const { Trade, Settlement } = require('../models');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { settleTrade } = require('../services/settlementService');
+const socketService = require('../services/socket');
 
 const router = express.Router();
 
@@ -26,6 +27,15 @@ router.post('/:tradeId', requireAuth, requireRole('admin'), async (req, res, nex
     trade.blockchainTxHash = settlement.blockchainTxHash;
     trade.settledAt = settlement.settledAt;
     await trade.save();
+
+    // The honest equivalent of the spec's "bid-executed" event — this is
+    // the one real place in the app a blockchain hash gets attached, so
+    // it's what the Orders page's "show blockchain link" behavior wires to.
+    socketService.emitOrderStatusChanged([String(trade.sellerId), String(trade.buyerId)], {
+      orderId: String(trade._id),
+      newStatus: trade.status,
+      blockchainHash: trade.blockchainTxHash,
+    });
 
     res.status(201).json(settlement);
   } catch (err) {

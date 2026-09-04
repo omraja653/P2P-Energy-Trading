@@ -1,6 +1,7 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import Navbar from './Navbar.jsx'
 import Chat from './Chat.jsx'
+import MatchNotificationPopup from './MatchNotificationPopup.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 
 // Gates every nested route behind a logged-in user (checked via the token
@@ -17,6 +18,7 @@ function ProtectedRoute() {
       <Navbar />
       <Outlet />
       <Chat />
+      <MatchNotificationPopup />
     </div>
   )
 }

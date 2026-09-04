@@ -113,6 +113,13 @@ const userSchema = new mongoose.Schema(
     },
     // Know-Your-Customer verification flag — gates real-money trading/settlement.
     kycVerified: { type: Boolean, default: false },
+    // Real, persisted top-up balance (Razorpay test-mode payments only —
+    // see routes/wallet.js). Distinct from the Wallet page's other numbers
+    // (lifetime earnings/savings), which are computed live from Trade
+    // history, not stored — this is the one actual stored-ledger field in
+    // the app, and only Razorpay top-up ever increases it (nothing spends
+    // it yet; see routes/wallet.js's comment on that scope boundary).
+    walletBalance: { type: Number, default: 0, min: 0 },
     // Profile page additions ----------------------------------------------
     // Data URI (base64), not a hosted file URL — there's no file/object
     // storage (S3, Cloudinary, etc.) wired into this project, so an

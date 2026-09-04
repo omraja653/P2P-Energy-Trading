@@ -1,6 +1,9 @@
 import { NavLink } from 'react-router-dom'
 
-const LINKS = [
+// Exported so Navbar.jsx can fold these straight into the main teal bar for
+// admin users (single-row nav) instead of rendering this component as a
+// second row underneath it.
+export const ADMIN_LINKS = [
   { to: '/admin', label: 'Dashboard', end: true },
   { to: '/admin/users', label: 'Users' },
   { to: '/admin/kyc', label: 'KYC' },
@@ -18,7 +21,7 @@ function AdminNav() {
   return (
     <div className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 py-2 sm:px-6">
-        {LINKS.map((link) => (
+        {ADMIN_LINKS.map((link) => (
           <NavLink
             key={link.to}
             to={link.to}

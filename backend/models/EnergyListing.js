@@ -13,12 +13,12 @@ const energyListingSchema = new mongoose.Schema(
         message: 'quantityKWh must be greater than 0',
       },
     },
-    // $/kWh, bounded to the platform's allowed trading band.
+    // ₹/kWh, bounded to the platform's allowed trading band.
     pricePerKwh: {
       type: Number,
       required: true,
-      min: [0.08, 'pricePerKwh must be at least $0.08'],
-      max: [0.2, 'pricePerKwh must be at most $0.20'],
+      min: [0.08, 'pricePerKwh must be at least ₹0.08'],
+      max: [0.2, 'pricePerKwh must be at most ₹0.20'],
     },
     // intraday = same-day near-term trading, dayahead = next-day market.
     tradingType: {
