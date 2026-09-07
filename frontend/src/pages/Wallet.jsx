@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.js'
 import api from '../services/api.js'
@@ -47,6 +47,12 @@ function Wallet() {
   const isProsumer = user?.type === 'prosumer'
 
   const [wallet, setWallet] = useState(null)
+  // Read inside the 'wallet-updated' socket handler to decide whether to
+  // toast — kept as a ref (not the `wallet` state closure, which would be
+  // stale inside an effect that only reruns on [user?.id]) so that check
+  // can happen before calling setWallet, not inside its updater (a setState
+  // updater must stay a pure function — React can invoke it more than once).
+  const walletBalanceRef = useRef(null)
   const [monthRevenue, setMonthRevenue] = useState(null)
   const [error, setError] = useState('')
   const [toast, setToast] = useState(null)
@@ -85,12 +91,17 @@ function Wallet() {
     return () => clearTimeout(timer)
   }, [toast])
 
-  // Real-time: this app has no 'wallet-updated'/'transaction-added' events
-  // (nothing emits them) — the real, honest trigger for "your wallet
-  // changed" is the same 'order-status-changed' event Orders listens to
-  // (fires on match and on settlement, targeted at this user). On receipt,
-  // re-fetch the wallet + this month's revenue (cheap real aggregation
-  // queries, not a fabricated payload) and refresh the transaction list.
+  useEffect(() => {
+    walletBalanceRef.current = wallet?.walletBalance ?? null
+  }, [wallet])
+
+  // Real-time: 'order-status-changed' (fires on match and on settlement,
+  // targeted at this user — same event Orders listens to) re-fetches the
+  // wallet + this month's revenue. 'wallet-updated' (fires when a Razorpay
+  // top-up completes) patches walletBalance directly from its payload.
+  // Both are backstops, not the only path — see handleTopUpSuccess below,
+  // which updates state synchronously from the top-up's own API response
+  // rather than depending solely on the socket event arriving.
   useEffect(() => {
     if (!user?.id) return
     connectAndJoin(user.id)
@@ -104,14 +115,19 @@ function Wallet() {
         .catch(() => {})
     }
 
-    // The one genuinely real trigger for this event: a Razorpay top-up
-    // just completed (see routes/wallet.js's verify-topup). Patches
-    // walletBalance directly from the event payload rather than
-    // refetching — the payload already carries the real post-credit
-    // number the backend just computed.
+    // A Razorpay top-up completed (see routes/wallet.js's verify-topup).
+    // handleTopUpSuccess below already applies this same update
+    // synchronously from the API response the instant the modal's own
+    // request completes, so this is a backstop for other cases (a second
+    // open tab, or if that direct update path ever changes) — skip the
+    // toast if the balance already matches (i.e. handleTopUpSuccess beat
+    // this event here), so a normal top-up doesn't show it twice.
     function onWalletUpdated(payload) {
+      const alreadyApplied = walletBalanceRef.current === payload.walletBalance
       setWallet((prev) => (prev ? { ...prev, walletBalance: payload.walletBalance } : prev))
-      showToast(`✅ ₹${payload.transaction?.amount ?? ''} added to wallet`)
+      if (!alreadyApplied) {
+        showToast(`✅ ₹${payload.transaction?.amount ?? ''} added to wallet`)
+      }
     }
 
     socket.on('order-status-changed', onOrderStatusChanged)
@@ -124,12 +140,21 @@ function Wallet() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
-  // Just closes the modal — the balance patch + success toast are owned by
-  // the live 'wallet-updated' socket event above, which reaches this same
-  // user's own connection right after verify-topup completes. Handling it
-  // in both places would just show the same toast twice.
-  function handleTopUpSuccess() {
+  // Applies the new balance synchronously from the top-up's own API
+  // response (verify-topup already returns `newBalance` — see
+  // routes/wallet.js) rather than waiting on the 'wallet-updated' socket
+  // event to arrive. That event still fires and still patches state (the
+  // handler above), which matters for e.g. a second open tab — but this
+  // page's own update no longer depends on it: if the socket was ever
+  // disconnected, delayed, or dropped a message, the balance used to only
+  // catch up on a manual refresh. onWalletUpdated's ref check keeps this
+  // from double-toasting once that event does arrive.
+  function handleTopUpSuccess(result) {
     setShowAddBalance(false)
+    if (typeof result?.newBalance === 'number') {
+      setWallet((prev) => (prev ? { ...prev, walletBalance: result.newBalance } : prev))
+      showToast('✅ Balance added to wallet')
+    }
   }
 
   function showToast(message) {
