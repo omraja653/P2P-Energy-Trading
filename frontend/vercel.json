@@ -1,0 +1,14 @@
+# In VS Code, frontend folder
+# Create new file: vercel.json
+
+# Content:
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
