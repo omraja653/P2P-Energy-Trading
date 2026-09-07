@@ -1,18 +1,22 @@
 import { io } from 'socket.io-client';
 
-// Same-origin, no explicit host — matches the relative-/api-path
-// architecture (services/api.js's baseURL, vite.config.js's dev proxy).
-// Whatever host/IP the browser used to load the page, the browser's own
-// origin is where this connects, and Vite's `/socket.io` proxy entry (dev)
-// or the same Express+http.Server process (prod, since server.js attaches
-// Socket.io to the same httpServer that serves /api) forwards it to the
-// real backend. Lazily created — the app doesn't need a live socket until
-// a page actually asks for one.
+// Same idea as services/api.js's VITE_API_URL: same-origin by default
+// (works in dev via Vite's `/socket.io` proxy entry, and in any
+// single-origin deployment where the same process serves both /api and
+// Socket.io), but explicit and required once frontend/backend are on
+// different origins — e.g. this app's Vercel+Render split, where the
+// deployed frontend has no proxy to reach the Render backend and a
+// same-origin socket would silently try to connect to Vercel's own
+// domain instead. Set VITE_WS_URL in Vercel's project env vars to the
+// Render backend's origin (no /api suffix — Socket.io's own path,
+// /socket.io, is separate from the REST API's base path).
 let socket = null;
 
 export function getSocket() {
   if (!socket) {
-    socket = io({ autoConnect: false });
+    const wsURL = import.meta.env.VITE_WS_URL || window.location.origin;
+    console.log('WebSocket URL:', wsURL);
+    socket = io(wsURL, { autoConnect: false });
   }
   return socket;
 }
