@@ -61,8 +61,14 @@ router.post('/add-balance', requireAuth, async (req, res, next) => {
       receipt: `topup_${req.user.id}_${Date.now()}`,
     });
 
+    // req.user (from the JWT payload) only carries id/type/verification
+    // flags — a fresh lookup is needed for the name/email snapshot.
+    const requester = await User.findById(req.user.id).select('firstName lastName email');
+
     await Transaction.create({
       userId: req.user.id,
+      userName: requester ? `${requester.firstName} ${requester.lastName}`.trim() : undefined,
+      userEmail: requester?.email,
       type: 'topup',
       amount,
       orderId: order.id,

@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { Trade, EnergyListing, User } = require('../models');
 const { requireAuth } = require('../middleware/auth');
 const { requireTradingVerification } = require('../middleware/verification');
@@ -32,45 +33,101 @@ router.post(
     try {
       const { quantityKWh, tradingType } = req.body;
       const listings = await EnergyListing.find({ status: 'active', tradingType });
-      const { matches, unmatchedKwh } = matchListings(listings, quantityKWh);
+      const { matches, unmatchedKwh: plannedUnmatchedKwh } = matchListings(listings, quantityKWh);
 
-      // Real wallet-balance gate — checked against the actual total this
-      // request would cost (computed from the real matches, not trusted
-      // from the client), before any Trade is created. See
-      // routes/slots.js for the same gate on the bid-placement path.
-      const totalCost = matches.reduce((sum, { listing, amount }) => sum + amount * listing.pricePerKwh, 0);
-      if (totalCost > 0) {
-        const buyer = await User.findById(req.user.id).select('walletBalance');
-        if ((buyer?.walletBalance ?? 0) < totalCost) {
-          return res.status(400).json({
-            error: `Insufficient balance. Need ₹${totalCost.toFixed(2)}, have ₹${(buyer?.walletBalance ?? 0).toFixed(2)}.`,
-          });
-        }
+      // --- Same two race conditions as slotMatchingService.matchSlot(),
+      // same fix (a real transaction), found in the same QA pass:
+      //
+      // 1. `matches` above is computed from a plain `find()` read — two
+      //    concurrent buy requests could both plan to buy the same
+      //    listing before either one's `EnergyListing.updateMany(...)`
+      //    (which used to run AFTER Trade.create) actually claimed it,
+      //    letting the same listing be sold twice over.
+      // 2. The old balance check (`buyer.walletBalance < totalCost`) was a
+      //    plain read-then-branch, not conditioned on the same write —
+      //    the same double-spend shape confirmed live in matchSlot().
+      //
+      // Fixed by atomically claiming each planned listing inside the
+      // transaction (skipping — not erroring on — any that lost the race,
+      // folding its quantity back into unmatchedKwh) and gating the
+      // buyer's debit on their real-time balance the same way.
+      const session = await mongoose.startSession();
+      let trades = [];
+      let unmatchedKwh = plannedUnmatchedKwh;
+      let insufficientFunds = false;
+      try {
+        await session.withTransaction(async () => {
+          const claimed = [];
+          for (const { listing, amount } of matches) {
+            const claimedListing = await EnergyListing.findOneAndUpdate(
+              { _id: listing._id, status: 'active' },
+              { $set: { status: 'matched' } },
+              { new: true, session }
+            );
+            if (!claimedListing) {
+              // Someone else claimed this listing concurrently — treat
+              // exactly like "wasn't available", same as the matcher's
+              // own unmatchedKwh accounting for a listing that ran out.
+              unmatchedKwh += amount;
+              continue;
+            }
+            claimed.push({ listing: claimedListing, amount });
+          }
+
+          const totalCost = claimed.reduce((sum, { listing, amount }) => sum + amount * listing.pricePerKwh, 0);
+
+          if (totalCost > 0) {
+            const buyerAfter = await User.findOneAndUpdate(
+              { _id: req.user.id, walletBalance: { $gte: totalCost } },
+              { $inc: { walletBalance: -totalCost } },
+              { new: true, session }
+            ).select('walletBalance');
+            if (!buyerAfter) {
+              insufficientFunds = true;
+              throw new Error('__insufficient_funds__');
+            }
+          }
+
+          for (const { listing, amount } of claimed) {
+            const [trade] = await Trade.create(
+              [
+                {
+                  listingId: listing._id,
+                  buyerId: req.user.id,
+                  sellerId: listing.prosumerId,
+                  quantityKWh: amount,
+                  pricePerKwh: listing.pricePerKwh,
+                  totalAmount: Number((amount * listing.pricePerKwh).toFixed(4)),
+                  tradingType,
+                  status: 'matched',
+                },
+              ],
+              { session }
+            );
+            await User.findByIdAndUpdate(listing.prosumerId, { $inc: { walletBalance: trade.totalAmount } }, { session });
+            trades.push(trade);
+          }
+        });
+      } catch (err) {
+        if (err.message !== '__insufficient_funds__') throw err;
+      } finally {
+        session.endSession();
       }
 
-      const trades = await Promise.all(
-        matches.map(({ listing, amount }) =>
-          Trade.create({
-            listingId: listing._id,
-            buyerId: req.user.id,
-            sellerId: listing.prosumerId,
-            quantityKWh: amount,
-            pricePerKwh: listing.pricePerKwh,
-            totalAmount: Number((amount * listing.pricePerKwh).toFixed(4)),
-            tradingType,
-            status: 'matched',
-          })
-        )
-      );
-
-      await EnergyListing.updateMany(
-        { _id: { $in: matches.map(({ listing }) => listing._id) } },
-        { $set: { status: 'matched' } }
-      );
+      if (insufficientFunds) {
+        const buyer = await User.findById(req.user.id).select('walletBalance');
+        const totalCost = matches.reduce((sum, { listing, amount }) => sum + amount * listing.pricePerKwh, 0);
+        return res.status(400).json({
+          error: `Insufficient balance. Need ₹${totalCost.toFixed(2)}, have ₹${(buyer?.walletBalance ?? 0).toFixed(2)}.`,
+        });
+      }
 
       // The buyer (requester) already has the trade in this response — the
       // seller finds out their listing sold asynchronously, so they're the
-      // one who needs a notification.
+      // one who needs a notification. Socket/email side effects stay
+      // outside the transaction — they aren't part of the atomic financial
+      // guarantee, and retrying a committed transaction would risk
+      // duplicating them.
       await Promise.all(
         trades.map((trade) =>
           notifyMatch({
@@ -85,22 +142,16 @@ router.post(
         )
       );
 
-      // Real wallet debit/credit — walletBalance is the Razorpay top-up
-      // ledger (see routes/wallet.js), separate from the existing
-      // admin/blockchain Settlement flow (routes/settlements.js), which is
-      // untouched by this. One debit for the buyer's combined total; one
-      // credit per trade for that trade's own seller — $inc is atomic per
-      // call, so a buyer matched against the same seller twice just
-      // applies two correct increments, no aggregation needed.
-      if (totalCost > 0) {
-        const buyerAfter = await User.findByIdAndUpdate(req.user.id, { $inc: { walletBalance: -totalCost } }, { new: true }).select('walletBalance');
+      if (trades.length) {
+        const buyerAfter = await User.findById(req.user.id).select('walletBalance');
+        const totalDebited = trades.reduce((sum, t) => sum + t.totalAmount, 0);
         socketService.emitWalletUpdated(req.user.id, {
           walletBalance: buyerAfter.walletBalance,
-          transaction: { type: 'purchase', amount: totalCost },
+          transaction: { type: 'purchase', amount: totalDebited },
         });
       }
       for (const trade of trades) {
-        const sellerAfter = await User.findByIdAndUpdate(trade.sellerId, { $inc: { walletBalance: trade.totalAmount } }, { new: true }).select('walletBalance');
+        const sellerAfter = await User.findById(trade.sellerId).select('walletBalance');
         socketService.emitWalletUpdated(trade.sellerId, {
           walletBalance: sellerAfter.walletBalance,
           transaction: { type: 'sale', amount: trade.totalAmount },

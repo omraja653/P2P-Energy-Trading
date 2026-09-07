@@ -8,14 +8,32 @@ const TRADING_TYPE_LABELS = {
 
 // `gridPrice` is optional — when given, the price highlights green if this
 // listing beats the grid retail rate.
-function ListingCard({ listing, currentUserId, onBuy, buying, gridPrice }) {
+//
+// Shared by two directions now, not just "consumer buys a prosumer's
+// listing": a sell-side card (EnergyListing, or a pending sell
+// TradingSlot) still reads `listing.prosumerId` by default, but a buy-side
+// card (a pending buy TradingSlot, shown so a prosumer can see real demand
+// — see Marketplace.jsx) passes `counterpartyId`/`counterpartyLabel`/
+// `actionLabel` instead, so the same card renders "Consumer: Bob — Sell to
+// Match" rather than "Prosumer: X — Buy Now". `disabledLabel` covers "this
+// card exists but your role can't act on it" (e.g. a consumer viewing
+// another consumer's buy bid) — a real, different case from "it's yours".
+function ListingCard({
+  listing,
+  currentUserId,
+  onBuy,
+  buying,
+  gridPrice,
+  actionLabel = 'Buy Now',
+  disabledLabel,
+}) {
   const [showDetails, setShowDetails] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
 
-  const prosumerName = listing.prosumerId
-    ? `${listing.prosumerId.firstName} ${listing.prosumerId.lastName}`
-    : 'Unknown'
-  const isOwnListing = listing.prosumerId?._id === currentUserId
+  const counterparty = listing.counterpartyId ?? listing.prosumerId
+  const counterpartyRoleLabel = listing.counterpartyLabel ?? 'Prosumer'
+  const counterpartyName = counterparty ? `${counterparty.firstName} ${counterparty.lastName}` : 'Unknown'
+  const isOwnListing = counterparty?._id === currentUserId
   const beatsGrid = typeof gridPrice === 'number' && listing.pricePerKwh < gridPrice
   const savingsVsGrid = beatsGrid ? (gridPrice - listing.pricePerKwh) * listing.quantityKWh : null
 
@@ -31,14 +49,14 @@ function ListingCard({ listing, currentUserId, onBuy, buying, gridPrice }) {
             onBlur={() => setShowTooltip(false)}
             className="text-sm text-slate-500 underline decoration-dotted underline-offset-2"
           >
-            Prosumer: <span className="font-medium text-slate-700">{prosumerName}</span>
+            {counterpartyRoleLabel}: <span className="font-medium text-slate-700">{counterpartyName}</span>
           </button>
 
           {/* Seller info tooltip — no rating shown: there's no seller-rating
               system in this app yet (flagged rather than faked). */}
           {showTooltip && (
             <div className="absolute left-0 top-full z-10 mt-1 w-56 rounded-lg bg-slate-900 p-3 text-xs text-white shadow-xl">
-              <p className="font-semibold">{prosumerName}</p>
+              <p className="font-semibold">{counterpartyName}</p>
               <p className="mt-1 text-white/70">Listed {formatDateTime(listing.createdAt)}</p>
               <p className="mt-1 text-white/70 capitalize">{TRADING_TYPE_LABELS[listing.tradingType] || listing.tradingType} market</p>
             </div>
@@ -77,11 +95,11 @@ function ListingCard({ listing, currentUserId, onBuy, buying, gridPrice }) {
         <button
           type="button"
           onClick={() => onBuy?.(listing)}
-          disabled={buying || isOwnListing}
-          title={isOwnListing ? "You can't buy your own listing" : undefined}
+          disabled={buying || isOwnListing || Boolean(disabledLabel)}
+          title={isOwnListing ? "You can't act on your own listing" : disabledLabel || undefined}
           className="min-h-[44px] flex-1 rounded-lg bg-brand-green px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50 sm:min-h-0"
         >
-          {buying ? 'Buying...' : isOwnListing ? 'Your listing' : 'Buy Now'}
+          {buying ? 'Working...' : isOwnListing ? 'Your listing' : disabledLabel || actionLabel}
         </button>
       </div>
     </div>

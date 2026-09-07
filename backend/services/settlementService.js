@@ -1,4 +1,4 @@
-const { Settlement } = require('../models');
+const { Settlement, User } = require('../models');
 const SystemSettings = require('../models/SystemSettings');
 const { recordTradeOnChain } = require('./blockchainService');
 
@@ -42,9 +42,22 @@ async function settleTrade(trade) {
   });
 
   try {
+    // Real fix: recordTradeOnChain needs actual wallet addresses, not raw
+    // Mongo ids (see blockchainService.js) — trade.buyerId/sellerId here
+    // are unpopulated ObjectId refs, so look the users up.
+    const [buyer, seller] = await Promise.all([
+      User.findById(trade.buyerId).select('walletAddress'),
+      User.findById(trade.sellerId).select('walletAddress'),
+    ]);
+    if (!buyer?.walletAddress || !seller?.walletAddress) {
+      throw new Error(
+        `Cannot settle on-chain: ${!buyer?.walletAddress ? 'buyer' : 'seller'} has no linked wallet address`
+      );
+    }
+
     const txHash = await recordTradeOnChain({
-      buyerId: trade.buyerId,
-      sellerId: trade.sellerId,
+      buyerAddress: buyer.walletAddress,
+      sellerAddress: seller.walletAddress,
       quantityKWh: trade.quantityKWh,
       totalAmount: trade.totalAmount,
     });

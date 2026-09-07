@@ -14,6 +14,18 @@ const STATUSES = ['pending', 'completed', 'failed'];
 const transactionSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    // Denormalized snapshot of the user's name/email at the time of the
+    // transaction — a deliberate exception to how the rest of this app
+    // handles a user reference (everywhere else populates userId live
+    // rather than copying name fields, e.g. Trade/TicketReply). Chosen
+    // here because a financial transaction record is an audit log: it
+    // should keep showing who it was for even if that person later
+    // renames their account, not silently rewrite history. Real values,
+    // not fabricated — User has firstName/lastName, not a single `name`
+    // field, so this is `${firstName} ${lastName}`, not `user.name`
+    // (which doesn't exist on this app's User model).
+    userName: { type: String },
+    userEmail: { type: String },
     type: { type: String, enum: TYPES, required: true },
     amount: { type: Number, required: true, min: 0 },
     orderId: { type: String, required: true },

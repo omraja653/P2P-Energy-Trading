@@ -1,6 +1,11 @@
+const mongoose = require('mongoose');
 const { TradingSlot, Trade, User } = require('../models');
 const { notifyMatch } = require('./notificationService');
 const socketService = require('./socket');
+
+// Internal-only sentinel: distinguishes "the transaction found insufficient
+// funds and aborted on purpose" from a real error, when caught below.
+class InsufficientFundsError extends Error {}
 
 /**
  * Places a bid, then immediately tries to match it against an opposing bid.
@@ -44,6 +49,11 @@ async function placeBid(userId, userType, hour, date, bidPrice, bidQuantity, bid
 async function matchSlot(slotId) {
   const slot = await TradingSlot.findById(slotId);
   if (!slot || slot.matched) return null;
+  // `slot` itself is never contended concurrently — only placeBid() ever
+  // calls matchSlot(), exactly once, right after creating this exact
+  // document, so no other request can be racing to claim `slot` the way
+  // one can race to claim `opposingBid` below (shared across every
+  // concurrent match attempt that finds it eligible).
 
   const opposingType = slot.bidType === 'sell' ? 'buy' : 'sell';
   // Best price first: a seller wants the highest-paying buyer, a buyer
@@ -56,6 +66,13 @@ async function matchSlot(slotId) {
     status: 'pending',
     matched: false,
     _id: { $ne: slot._id },
+    // Price-overlap folded directly into the claim filter below, not a
+    // separate post-hoc check — `slot.bidPrice` is a plain number already
+    // in hand, not a second query, so there's no reason this can't be part
+    // of the same atomic operation. (Previously: fetch first, then
+    // `if (sellBid.bidPrice > buyBid.bidPrice) return null` — correct
+    // logic, just not atomic with the fetch.)
+    bidPrice: slot.bidType === 'sell' ? { $gte: slot.bidPrice } : { $lte: slot.bidPrice },
   };
   if (slot.tradingType) {
     matchQuery.tradingType = slot.tradingType; // full-day: any hour, same trading type
@@ -64,68 +81,127 @@ async function matchSlot(slotId) {
     matchQuery.tradingType = { $exists: false };
   }
 
-  const opposingBid = await TradingSlot.findOne(matchQuery).sort({ bidPrice: sortOrder });
+  // --- Real fix for two confirmed race conditions (double-sell / negative
+  // wallet balance), found live during a QA pass on this feature:
+  //
+  // 1. Double-sell: the old code did `findOne(...)` (read) then, much
+  //    later, `bid.save()` (write) to mark the opposing bid matched — two
+  //    concurrent matchSlot() calls both racing for the SAME opposing bid
+  //    could both read it as still-pending before either write landed,
+  //    both create a Trade against it. Confirmed live: one 5 kWh sell bid
+  //    matched into two separate Trades when two buyers hit it at once.
+  //
+  // 2. Negative balance: the balance check (`walletBalance < executedTotal`)
+  //    was a plain read-then-branch, not conditioned on the same write —
+  //    two concurrent matches debiting the same buyer could both pass the
+  //    check before either debit landed. Confirmed live: a ₹100 balance
+  //    went to -₹20 after two concurrent ₹60 matches.
+  //
+  // Fixed with a real multi-document transaction (MongoDB Atlas supports
+  // these on its replica-set clusters, including the free tier) rather
+  // than manual claim-then-compensate rollbacks: the opposing-bid claim,
+  // the balance-gated debit, the credit, and the Trade creation all commit
+  // or abort together, so an insufficient-funds abort automatically
+  // reverts the bid claim too — no separate "undo" step to get wrong.
+  const session = await mongoose.startSession();
+  let result = null;
+  try {
+    await session.withTransaction(async () => {
+      // Atomic claim: finds the best-priced eligible opposing bid AND
+      // marks it matched in one operation. Only one concurrent caller can
+      // win this for a given document — every other caller gets null back
+      // (a real bid that just became ineligible, not "no bid exists"),
+      // which this function treats exactly like the pre-existing "no
+      // match found" outcome (both sides stay pending).
+      const opposingBid = await TradingSlot.findOneAndUpdate(
+        matchQuery,
+        { $set: { matched: true, status: 'matched' } },
+        { sort: { bidPrice: sortOrder }, new: true, session }
+      );
+      if (!opposingBid) return; // result stays null
 
-  if (!opposingBid) return null;
+      const sellBid = slot.bidType === 'sell' ? slot : opposingBid;
+      const buyBid = slot.bidType === 'sell' ? opposingBid : slot;
+      const executedQuantity = Math.min(slot.bidQuantity, opposingBid.bidQuantity);
+      const executedPrice = Number(((sellBid.bidPrice + buyBid.bidPrice) / 2).toFixed(4));
+      const executedTotal = Number((executedQuantity * executedPrice).toFixed(4));
 
-  const sellBid = slot.bidType === 'sell' ? slot : opposingBid;
-  const buyBid = slot.bidType === 'sell' ? opposingBid : slot;
-  if (sellBid.bidPrice > buyBid.bidPrice) return null; // no overlap — seller wants more than buyer offers
+      // Atomic, balance-gated debit: the $gte condition is checked by
+      // MongoDB at the moment of the write, not via a separate earlier
+      // read — this is what actually closes the negative-balance race
+      // (routes/slots.js's placement-time check is now correctly just a
+      // soft up-front UX gate; this is the real backstop that moves money).
+      const buyerAfter = await User.findOneAndUpdate(
+        { _id: buyBid.userId, walletBalance: { $gte: executedTotal } },
+        { $inc: { walletBalance: -executedTotal } },
+        { new: true, session }
+      ).select('walletBalance');
 
-  const executedQuantity = Math.min(slot.bidQuantity, opposingBid.bidQuantity);
-  const executedPrice = Number(((sellBid.bidPrice + buyBid.bidPrice) / 2).toFixed(4));
-  const executedTotal = Number((executedQuantity * executedPrice).toFixed(4));
+      if (!buyerAfter) {
+        // Insufficient funds, discovered only now that the opposing bid is
+        // claimed — abort the whole transaction. MongoDB rolls the claim
+        // back automatically; both bids end up exactly as pending as they
+        // were before this attempt, same external behavior as before this
+        // fix (a silent "no match", not a rejection of the buyer's own
+        // triggering request — surfacing that distinctly still isn't
+        // covered here, same disclosed limitation as before).
+        throw new InsufficientFundsError();
+      }
 
-  // Final real balance check right before the match actually happens —
-  // routes/slots.js already checks this at bid-*placement* time, but that
-  // check used the bid's own price/quantity, not the executed
-  // price/quantity a match settles at (the midpoint of both bids, per
-  // this function's pricing above), and multiple pending bids can combine
-  // to exceed a balance that was fine for each individually. If the buyer
-  // can't actually cover the executed total, this match doesn't happen —
-  // both bids stay pending, same as any other no-match outcome (a price
-  // gap, no opposing bid yet). Flagged, not fixed further: the buyer who
-  // triggered this (via their own placeBid call) just sees "still
-  // pending" rather than a specific "insufficient funds" message for this
-  // particular match — surfacing that distinctly would need placeBid to
-  // propagate a reason, more invasive than this scope covers.
-  const buyerUser = await User.findById(buyBid.userId).select('walletBalance');
-  if ((buyerUser?.walletBalance ?? 0) < executedTotal) return null;
+      const sellerAfter = await User.findOneAndUpdate(
+        { _id: sellBid.userId },
+        { $inc: { walletBalance: executedTotal } },
+        { new: true, session }
+      ).select('walletBalance');
 
-  const trade = await Trade.create({
-    sellerId: sellBid.userId,
-    buyerId: buyBid.userId,
-    quantityKWh: executedQuantity,
-    pricePerKwh: executedPrice,
-    totalAmount: executedTotal,
-    tradingType: slot.tradingType || 'intraday',
-    status: 'matched',
-  });
+      const [trade] = await Trade.create(
+        [
+          {
+            sellerId: sellBid.userId,
+            buyerId: buyBid.userId,
+            quantityKWh: executedQuantity,
+            pricePerKwh: executedPrice,
+            totalAmount: executedTotal,
+            tradingType: slot.tradingType || 'intraday',
+            status: 'matched',
+          },
+        ],
+        { session }
+      );
 
-  // Real wallet debit/credit — walletBalance is the Razorpay top-up
-  // ledger (routes/wallet.js), separate from the existing admin/blockchain
-  // Settlement flow (routes/settlements.js), which this doesn't touch.
-  const [buyerAfter, sellerAfter] = await Promise.all([
-    User.findByIdAndUpdate(buyBid.userId, { $inc: { walletBalance: -executedTotal } }, { new: true }).select('walletBalance'),
-    User.findByIdAndUpdate(sellBid.userId, { $inc: { walletBalance: executedTotal } }, { new: true }).select('walletBalance'),
-  ]);
-  socketService.emitWalletUpdated(buyBid.userId, {
+      for (const bid of [slot, opposingBid]) {
+        bid.matched = true;
+        bid.status = 'matched';
+        bid.executedQuantity = executedQuantity;
+        bid.executedPrice = executedPrice;
+        bid.tradeId = trade._id;
+        await bid.save({ session });
+      }
+
+      result = { trade, slot, opposingBid, buyerAfter, sellerAfter, executedTotal, buyUserId: buyBid.userId, sellUserId: sellBid.userId };
+    });
+  } catch (err) {
+    if (!(err instanceof InsufficientFundsError)) throw err;
+    result = null;
+  } finally {
+    session.endSession();
+  }
+
+  if (!result) return null;
+
+  const { trade, opposingBid, buyerAfter, sellerAfter, executedTotal, buyUserId, sellUserId } = result;
+
+  // Side effects below are deliberately outside the transaction — sockets/
+  // emails aren't part of the atomic financial guarantee, and retrying a
+  // transaction that had already sent one would risk sending it twice.
+  socketService.emitWalletUpdated(buyUserId, {
     walletBalance: buyerAfter.walletBalance,
     transaction: { type: 'purchase', amount: executedTotal },
   });
-  socketService.emitWalletUpdated(sellBid.userId, {
+  socketService.emitWalletUpdated(sellUserId, {
     walletBalance: sellerAfter.walletBalance,
     transaction: { type: 'sale', amount: executedTotal },
   });
-
-  for (const bid of [slot, opposingBid]) {
-    bid.matched = true;
-    bid.status = 'matched';
-    bid.executedQuantity = executedQuantity;
-    bid.executedPrice = executedPrice;
-    bid.tradeId = trade._id;
-    await bid.save();
-  }
 
   // `slot` is whoever's placeBid() call triggered this match — they already
   // get the result in that call's own response. `opposingBid`'s owner found
@@ -135,8 +211,8 @@ async function matchSlot(slotId) {
     userId: opposingBid.userId,
     counterpartyId: slot.userId,
     tradeId: trade._id,
-    quantityKWh: executedQuantity,
-    pricePerKwh: executedPrice,
+    quantityKWh: trade.quantityKWh,
+    pricePerKwh: trade.pricePerKwh,
     totalAmount: trade.totalAmount,
     asBuyer: opposingBid.bidType === 'buy',
   });
@@ -147,7 +223,7 @@ async function matchSlot(slotId) {
   // (status 'matched', no blockchain hash yet — that only exists once an
   // admin actually runs settlement, see routes/settlements.js).
   socketService.emitBidMatched([String(slot._id), String(opposingBid._id)]);
-  socketService.emitOrderStatusChanged([String(sellBid.userId), String(buyBid.userId)], {
+  socketService.emitOrderStatusChanged([String(sellUserId), String(buyUserId)], {
     orderId: String(trade._id),
     newStatus: trade.status,
     quantityKWh: trade.quantityKWh,
@@ -184,16 +260,33 @@ async function getActiveBids(userId) {
   return TradingSlot.find({ userId, status: 'pending' }).sort({ createdAt: -1 });
 }
 
-/** Only a still-pending (unmatched) bid can be cancelled — once matched, a real Trade exists. */
+/**
+ * Only a still-pending (unmatched) bid can be cancelled — once matched, a
+ * real Trade exists. Atomic claim (found during the same QA pass as the
+ * matching races above): two concurrent identical cancel requests used to
+ * both succeed (read-then-write gap between the `findOne` and `.save()`),
+ * which is harmless here (same end state, no money moved) but still fired
+ * the bid-cancelled broadcast twice. findOneAndUpdate closes that gap the
+ * same way the match-claim above does — only the first caller gets the
+ * updated doc back; a second concurrent call sees status already
+ * 'cancelled' and correctly falls into not_cancellable instead.
+ */
 async function cancelBid(slotId, userId) {
-  const slot = await TradingSlot.findOne({ _id: slotId, userId });
-  if (!slot) return { error: 'not_found' };
-  if (slot.status !== 'pending') return { error: 'not_cancellable' };
+  const slot = await TradingSlot.findOneAndUpdate(
+    { _id: slotId, userId, status: 'pending' },
+    { $set: { status: 'cancelled' } },
+    { new: true }
+  );
+  if (slot) {
+    socketService.emitBidCancelled(String(slot._id));
+    return { slot };
+  }
 
-  slot.status = 'cancelled';
-  await slot.save();
-  socketService.emitBidCancelled(String(slot._id));
-  return { slot };
+  // Distinguish "doesn't exist / not yours" from "exists but not
+  // cancellable" for the same error messages the route already returns.
+  const existing = await TradingSlot.findOne({ _id: slotId, userId });
+  if (!existing) return { error: 'not_found' };
+  return { error: 'not_cancellable' };
 }
 
 module.exports = { placeBid, matchSlot, getSlotsByDate, getUserSlots, getActiveBids, cancelBid };

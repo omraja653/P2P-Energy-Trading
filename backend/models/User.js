@@ -1,7 +1,19 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Same pattern scripts/seed.js already uses for its demo prosumers — a
+// random, well-formed-looking address, not a real user-controlled wallet
+// (no private key exists anywhere for it). Real MetaMask/wallet linking
+// isn't built in this app; this exists purely so every account has SOME
+// address to pass to the EnergyTrade contract's recordTrade() call, which
+// only stores buyer/seller as opaque on-chain data — it never needs these
+// addresses to sign anything or hold funds.
+function fakeWalletAddress() {
+  return '0x' + crypto.randomBytes(20).toString('hex');
+}
 
 const userSchema = new mongoose.Schema(
   {
@@ -139,6 +151,20 @@ const userSchema = new mongoose.Schema(
 
 // email and walletAddress already get unique indexes from `unique: true`
 // above (walletAddress is also `sparse` so docs without one don't collide).
+
+// Every account gets a walletAddress on creation, not just seed.js's demo
+// prosumers — this was a real gap: settlementService.settleTrade() needs
+// BOTH the buyer's and the seller's address to call the EnergyTrade
+// contract, but nothing ever set one for a consumer (or any real signup),
+// so on-chain settlement could never actually succeed outside the two
+// hardcoded seed accounts. See the fakeWalletAddress() comment above for
+// what this address is (and isn't).
+userSchema.pre('validate', function assignWalletAddress(next) {
+  if (this.isNew && !this.walletAddress) {
+    this.walletAddress = fakeWalletAddress();
+  }
+  next();
+});
 
 // Write-only virtual: `user.password = 'plaintext'` (or passing `password` to
 // User.create/new User) hashes into passwordHash on save. Enforces the

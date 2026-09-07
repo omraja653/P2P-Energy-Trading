@@ -74,40 +74,45 @@ function RegistrationForm({ onRegistered }) {
   }
 
   return (
-    <div className="w-full rounded-lg bg-white p-8 shadow-2xl">
-      <h1 className="text-center text-2xl font-bold text-slate-900">Create your GridMate account</h1>
-      <p className="mt-1 text-center text-sm text-slate-500">Join the P2P energy marketplace</p>
+    <div className="w-full rounded-2xl bg-white p-3 shadow-2xl sm:p-4 lg:p-5">
+      <div className="text-center">
+        {/* Logo hidden below lg — pure space-saving on short viewports,
+            same real brand mark still shows once there's room for it. */}
+        <div className="hidden lg:block lg:mb-1 lg:text-2xl">⚡</div>
+        <h1 className="text-lg font-bold text-slate-900 lg:text-2xl">Create your GridMate account</h1>
+        <p className="mt-0.5 text-xs text-slate-500 lg:text-sm">Join the P2P energy marketplace</p>
+      </div>
 
-      <form onSubmit={handleSubmit} noValidate className="mt-6 flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-3">
+      <form onSubmit={handleSubmit} noValidate className="mt-2 flex flex-col gap-2 lg:mt-3">
+        <div className="grid grid-cols-2 gap-1.5 lg:gap-2">
           <div>
-            <label htmlFor="firstName" className="block text-sm font-medium text-slate-700">
+            <label htmlFor="firstName" className="block text-xs font-semibold text-slate-900">
               First name
             </label>
             <input
               id="firstName"
               value={form.firstName}
               onChange={(e) => update('firstName', e.target.value)}
-              className="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:border-primary focus:outline-none"
+              className="mt-0.5 w-full rounded-lg border-2 border-slate-200 px-2 py-1.5 text-xs transition duration-200 focus:border-teal focus:outline-none lg:py-2 lg:text-sm"
             />
-            {fieldErrors.firstName && <p className="mt-1 text-xs text-red-600">{fieldErrors.firstName}</p>}
+            {fieldErrors.firstName && <p className="mt-0.5 text-xs text-red-600">{fieldErrors.firstName}</p>}
           </div>
           <div>
-            <label htmlFor="lastName" className="block text-sm font-medium text-slate-700">
+            <label htmlFor="lastName" className="block text-xs font-semibold text-slate-900">
               Last name
             </label>
             <input
               id="lastName"
               value={form.lastName}
               onChange={(e) => update('lastName', e.target.value)}
-              className="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:border-primary focus:outline-none"
+              className="mt-0.5 w-full rounded-lg border-2 border-slate-200 px-2 py-1.5 text-xs transition duration-200 focus:border-teal focus:outline-none lg:py-2 lg:text-sm"
             />
-            {fieldErrors.lastName && <p className="mt-1 text-xs text-red-600">{fieldErrors.lastName}</p>}
+            {fieldErrors.lastName && <p className="mt-0.5 text-xs text-red-600">{fieldErrors.lastName}</p>}
           </div>
         </div>
 
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="email" className="block text-xs font-semibold text-slate-900">
             Email
           </label>
           <input
@@ -116,15 +121,15 @@ function RegistrationForm({ onRegistered }) {
             autoComplete="email"
             value={form.email}
             onChange={(e) => update('email', e.target.value)}
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:border-primary focus:outline-none"
+            className="mt-0.5 w-full rounded-lg border-2 border-slate-200 px-2 py-1.5 text-xs transition duration-200 focus:border-teal focus:outline-none lg:py-2 lg:text-sm"
             placeholder="you@example.com"
           />
-          {fieldErrors.email && <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>}
+          {fieldErrors.email && <p className="mt-0.5 text-xs text-red-600">{fieldErrors.email}</p>}
         </div>
 
         <div>
-          <label htmlFor="mobileNumber" className="block text-sm font-medium text-slate-700">
-            Mobile number <span className="font-normal text-slate-400">(optional)</span>
+          <label htmlFor="mobileNumber" className="block text-xs font-semibold text-slate-900">
+            Mobile number <span className="font-normal text-slate-500">(optional)</span>
           </label>
           <input
             id="mobileNumber"
@@ -132,18 +137,18 @@ function RegistrationForm({ onRegistered }) {
             autoComplete="tel"
             value={form.mobileNumber}
             onChange={(e) => update('mobileNumber', e.target.value)}
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:border-primary focus:outline-none"
+            className="mt-0.5 w-full rounded-lg border-2 border-slate-200 px-2 py-1.5 text-xs transition duration-200 focus:border-teal focus:outline-none lg:py-2 lg:text-sm"
             placeholder="+918468810197"
           />
           {fieldErrors.mobileNumber ? (
-            <p className="mt-1 text-xs text-red-600">{fieldErrors.mobileNumber}</p>
+            <p className="mt-0.5 text-xs text-red-600">{fieldErrors.mobileNumber}</p>
           ) : (
-            <p className="mt-1 text-xs text-slate-400">Include your country code (e.g. +91 for India).</p>
+            <p className="mt-0.5 text-xs text-slate-500">Include your country code (e.g. +91 for India).</p>
           )}
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="password" className="block text-xs font-semibold text-slate-900">
             Password
           </label>
           <input
@@ -152,20 +157,26 @@ function RegistrationForm({ onRegistered }) {
             autoComplete="new-password"
             value={form.password}
             onChange={(e) => update('password', e.target.value)}
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:border-primary focus:outline-none"
+            className="mt-0.5 w-full rounded-lg border-2 border-slate-200 px-2 py-1.5 text-xs transition duration-200 focus:border-teal focus:outline-none lg:py-2 lg:text-sm"
             placeholder="••••••••"
           />
-          <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+          {/* Live checklist hidden below lg to save vertical space — still
+              fully enforced either way: validate() checks passwordValid
+              regardless of whether this is visible, so a mobile user who
+              submits an invalid password still gets the fieldErrors.password
+              message below, they just don't see the live per-rule list
+              while typing. */}
+          <ul className="mt-1 hidden grid-cols-2 gap-x-3 gap-y-0.5 text-xs lg:grid">
             {checklist.map((rule) => (
-              <li key={rule.label} className={rule.valid ? 'text-green-600' : 'text-slate-400'}>
-                {rule.valid ? '✓' : '○'} {rule.label}
+              <li key={rule.label} className={`flex items-center ${rule.valid ? 'text-green-600' : 'text-slate-500'}`}>
+                {rule.valid ? '✓' : '○'} <span className="ml-1">{rule.label}</span>
               </li>
             ))}
           </ul>
         </div>
 
         <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="confirmPassword" className="block text-xs font-semibold text-slate-900">
             Confirm password
           </label>
           <input
@@ -174,34 +185,40 @@ function RegistrationForm({ onRegistered }) {
             autoComplete="new-password"
             value={form.confirmPassword}
             onChange={(e) => update('confirmPassword', e.target.value)}
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2 focus:border-primary focus:outline-none"
+            className="mt-0.5 w-full rounded-lg border-2 border-slate-200 px-2 py-1.5 text-xs transition duration-200 focus:border-teal focus:outline-none lg:py-2 lg:text-sm"
             placeholder="••••••••"
           />
           {fieldErrors.confirmPassword && (
-            <p className="mt-1 text-xs text-red-600">{fieldErrors.confirmPassword}</p>
+            <p className="mt-0.5 text-xs text-red-600">{fieldErrors.confirmPassword}</p>
           )}
         </div>
 
         {formError && (
-          <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-600" role="alert">
+          <p className="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600" role="alert">
             {formError}
           </p>
         )}
 
+        {/* min-h-[44px] kept regardless of the tighter padding/text below —
+            this app's established touch-target convention (see the earlier
+            responsive-design pass) treats a submit button differently from
+            a text input: a tap target shouldn't shrink below 44px just
+            because the surrounding form got more compact. */}
         <button
           type="submit"
           disabled={submitting}
-          className="mt-2 rounded bg-primary px-4 py-2 font-medium text-white hover:opacity-90 disabled:opacity-50"
+          style={{ backgroundImage: 'linear-gradient(to right, #2fd57d, #2ac6a7, #2d7ae6)' }}
+          className="mt-0.5 min-h-[44px] rounded-lg px-4 py-1.5 text-xs font-bold text-white transition duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-teal focus:ring-offset-2 disabled:opacity-50 lg:py-2 lg:text-sm"
         >
-          {submitting ? 'Creating account...' : 'Register'}
+          {submitting ? 'Creating account...' : 'Create Account'}
         </button>
         {submitting && <LoadingSpinner />}
       </form>
 
-      <p className="mt-6 text-center text-sm text-slate-500">
+      <p className="mt-1.5 text-center text-xs text-slate-500">
         Already have an account?{' '}
-        <Link to="/login" className="text-primary hover:underline">
-          Login
+        <Link to="/login" className="font-semibold text-[#1abf87] hover:underline">
+          Login here
         </Link>
       </p>
     </div>
@@ -331,7 +348,7 @@ function Register() {
   }
 
   return (
-    <AuthLayout>
+    <AuthLayout maxWidthClassName={step === 'form' ? 'max-w-lg' : 'max-w-md'}>
       {step === 'form' && (
         <RegistrationForm
           onRegistered={(reg) => {
