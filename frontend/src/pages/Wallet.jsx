@@ -8,6 +8,7 @@ import { connectAndJoin, disconnectSocket, getSocket } from '../services/socket.
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import StatusBadge from '../components/StatusBadge.jsx'
 import AddBalanceModal from '../components/AddBalanceModal.jsx'
+import KYCVerificationModal from '../components/KYCVerificationModal.jsx'
 import { formatCurrency, formatCurrency3, formatKwh, formatDateTime, truncateHash } from '../utils/formatting.js'
 
 const EXPLORER_TX_URL = 'https://amoy.polygonscan.com/tx/'
@@ -58,6 +59,7 @@ function Wallet() {
   const [toast, setToast] = useState(null)
   const [expanded, setExpanded] = useState(() => new Set())
   const [showAddBalance, setShowAddBalance] = useState(false)
+  const [showKycModal, setShowKycModal] = useState(false)
 
   const [trades, setTrades] = useState({ data: null, loading: true, error: null })
   const [settlements, setSettlements] = useState({ data: null, loading: true, error: null })
@@ -230,14 +232,37 @@ function Wallet() {
                 <p className="text-sm font-medium text-slate-500">Wallet Balance</p>
                 <p className="mt-1 text-3xl font-bold text-slate-900">{formatCurrency(wallet.walletBalance)}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowAddBalance(true)}
-                style={{ backgroundColor: 'rgb(0, 150, 135)' }}
-                className="min-h-[44px] rounded-lg px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
-              >
-                + Add Balance
-              </button>
+              {/* Real gate, not just a UI nicety — the backend independently
+                  re-checks this with a fresh DB lookup on every
+                  add-balance call (routes/wallet.js), since this flag can
+                  go stale between token issuances. Below-verified state
+                  reuses the existing KYCVerificationModal rather than a
+                  new self-service "verify yourself" flow — this app has no
+                  real KYC submission/review system (see that component's
+                  own comment), so faking an instant "Start KYC" button
+                  that flips the flag would let any user bypass the same
+                  check trading already enforces. */}
+              {user?.kycVerified ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAddBalance(true)}
+                  style={{ backgroundColor: 'rgb(0, 150, 135)' }}
+                  className="min-h-[44px] rounded-lg px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+                >
+                  + Add Balance
+                </button>
+              ) : (
+                <div className="text-right">
+                  <p className="text-sm text-orange-600">Complete KYC to add money</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowKycModal(true)}
+                    className="mt-1 min-h-[44px] rounded-lg border border-orange-300 px-4 py-2 text-sm font-semibold text-orange-600 transition hover:bg-orange-50"
+                  >
+                    Start KYC
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Balance cards. Deviation flagged: the pasted spec's consumer
@@ -489,6 +514,7 @@ function Wallet() {
       {showAddBalance && (
         <AddBalanceModal onClose={() => setShowAddBalance(false)} onSuccess={handleTopUpSuccess} />
       )}
+      {showKycModal && <KYCVerificationModal onClose={() => setShowKycModal(false)} />}
     </div>
   )
 }

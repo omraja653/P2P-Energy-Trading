@@ -50,6 +50,22 @@ router.post('/add-balance', requireAuth, async (req, res, next) => {
     if (!['prosumer', 'consumer'].includes(req.user.type)) {
       return res.status(403).json({ error: 'Wallet is only available to consumer/prosumer accounts' });
     }
+
+    // req.user (from the JWT payload) only carries id/type/verification
+    // flags — a fresh lookup is needed here (not just for the name/email
+    // snapshot below) because those flags can go stale between token
+    // issuances, e.g. an admin approves KYC mid-session (see the same
+    // discipline in middleware/verification.js's requireTradingVerification,
+    // which this mirrors rather than reuses, since that middleware's error
+    // message is specifically worded for trading, not a wallet top-up).
+    const requester = await User.findById(req.user.id).select('firstName lastName email kycVerified');
+    if (!requester) return res.status(404).json({ error: 'User not found' });
+
+    if (!requester.kycVerified) {
+      console.log(`[wallet] blocked add-balance for user ${req.user.id}: KYC not verified`);
+      return res.status(403).json({ error: 'KYC verification required to add money to your wallet', requiresKyc: true });
+    }
+
     const amount = Number(req.body.amount);
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
@@ -60,10 +76,6 @@ router.post('/add-balance', requireAuth, async (req, res, next) => {
       currency: 'INR',
       receipt: `topup_${req.user.id}_${Date.now()}`,
     });
-
-    // req.user (from the JWT payload) only carries id/type/verification
-    // flags — a fresh lookup is needed for the name/email snapshot.
-    const requester = await User.findById(req.user.id).select('firstName lastName email');
 
     await Transaction.create({
       userId: req.user.id,
