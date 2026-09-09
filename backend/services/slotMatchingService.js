@@ -148,11 +148,16 @@ async function matchSlot(slotId) {
         throw new InsufficientFundsError();
       }
 
-      const sellerAfter = await User.findOneAndUpdate(
-        { _id: sellBid.userId },
-        { $inc: { walletBalance: executedTotal } },
-        { new: true, session }
-      ).select('walletBalance');
+      // Real design change: the seller is NOT credited here anymore. They
+      // used to get the full executedTotal immediately at match time,
+      // with settlementService later deducting the fee back out — that
+      // worked, but meant the wallet briefly showed the wrong (gross)
+      // number for however long a trade sat unsettled, and needed a
+      // negative-balance guard for an edge case (a role-switched seller
+      // spending that gross credit as a consumer before settlement ran).
+      // Now the seller is credited exactly once, with the net
+      // prosumerAmount, at actual settlement time (settlementService.js)
+      // — never gross, never twice, no reconciliation needed.
 
       const [trade] = await Trade.create(
         [
@@ -178,7 +183,7 @@ async function matchSlot(slotId) {
         await bid.save({ session });
       }
 
-      result = { trade, slot, opposingBid, buyerAfter, sellerAfter, executedTotal, buyUserId: buyBid.userId, sellUserId: sellBid.userId };
+      result = { trade, slot, opposingBid, buyerAfter, executedTotal, buyUserId: buyBid.userId, sellUserId: sellBid.userId };
     });
   } catch (err) {
     if (!(err instanceof InsufficientFundsError)) throw err;
@@ -189,18 +194,18 @@ async function matchSlot(slotId) {
 
   if (!result) return null;
 
-  const { trade, opposingBid, buyerAfter, sellerAfter, executedTotal, buyUserId, sellUserId } = result;
+  const { trade, opposingBid, buyerAfter, executedTotal, buyUserId, sellUserId } = result;
 
   // Side effects below are deliberately outside the transaction — sockets/
   // emails aren't part of the atomic financial guarantee, and retrying a
   // transaction that had already sent one would risk sending it twice.
+  // Only the buyer's wallet actually changed here — the seller isn't
+  // credited until settlement (see settlementService.js), so no
+  // wallet-updated event for them yet; a live 'order-status-changed' for
+  // both parties still fires below, since the trade itself is real now.
   socketService.emitWalletUpdated(buyUserId, {
     walletBalance: buyerAfter.walletBalance,
     transaction: { type: 'purchase', amount: executedTotal },
-  });
-  socketService.emitWalletUpdated(sellUserId, {
-    walletBalance: sellerAfter.walletBalance,
-    transaction: { type: 'sale', amount: executedTotal },
   });
 
   // `slot` is whoever's placeBid() call triggered this match — they already
@@ -220,8 +225,8 @@ async function matchSlot(slotId) {
   // Marketplace: both bids just stopped being "available" — broadcast so
   // every connected client (not just these two users) removes them from
   // its live list. Orders: the two users involved get the real new Trade
-  // (status 'matched', no blockchain hash yet — that only exists once an
-  // admin actually runs settlement, see routes/settlements.js).
+  // (status 'matched', no blockchain hash yet — that only exists once
+  // settlement actually runs, automatically, see jobs/settlementScheduler.js).
   socketService.emitBidMatched([String(slot._id), String(opposingBid._id)]);
   socketService.emitOrderStatusChanged([String(sellUserId), String(buyUserId)], {
     orderId: String(trade._id),

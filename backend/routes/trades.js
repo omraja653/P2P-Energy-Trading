@@ -104,7 +104,12 @@ router.post(
               ],
               { session }
             );
-            await User.findByIdAndUpdate(listing.prosumerId, { $inc: { walletBalance: trade.totalAmount } }, { session });
+            // Real design change: the seller is no longer credited here.
+            // They get exactly one credit — the net prosumerAmount, at
+            // actual settlement time (settlementService.js /
+            // jobs/settlementScheduler.js) — not the full gross amount
+            // immediately, with a later fee correction. Same reasoning as
+            // slotMatchingService.matchSlot()'s matching change.
             trades.push(trade);
           }
         });
@@ -150,14 +155,6 @@ router.post(
           transaction: { type: 'purchase', amount: totalDebited },
         });
       }
-      for (const trade of trades) {
-        const sellerAfter = await User.findById(trade.sellerId).select('walletBalance');
-        socketService.emitWalletUpdated(trade.sellerId, {
-          walletBalance: sellerAfter.walletBalance,
-          transaction: { type: 'sale', amount: trade.totalAmount },
-        });
-      }
-
       // Same real 'matched' Trade status as the slot-matching path — Orders
       // page gets live updates from this instant-match flow too, not just
       // the /bid order book.

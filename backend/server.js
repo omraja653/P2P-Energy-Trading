@@ -49,6 +49,13 @@ if (require.main === module) {
   httpServer.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
+  // Guarded the same way httpServer.listen() is — every test file does
+  // `require('../server')`, and starting a real setInterval that makes
+  // real blockchain calls during automated tests would be a serious
+  // problem (10 test files × their own interval, hitting real Mongo test
+  // data and the real chain). Only actually starts when this file is
+  // run directly, i.e. the real dev/production server.
+  require('./jobs/settlementScheduler').start();
 }
 
 module.exports = app;

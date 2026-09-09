@@ -241,8 +241,16 @@ function Wallet() {
                   real KYC submission/review system (see that component's
                   own comment), so faking an instant "Start KYC" button
                   that flips the flag would let any user bypass the same
-                  check trading already enforces. */}
-              {user?.kycVerified ? (
+                  check trading already enforces.
+                  Reads wallet.kycVerified (this page's own fresh fetch),
+                  not user?.kycVerified — that's useAuth()'s cached
+                  session snapshot from login time, never refreshed when
+                  an admin approves KYC on a separate session. That
+                  mismatch was a real bug: the Verification Status page
+                  (UserProfile.jsx) already does its own fresh GET /profile
+                  fetch, so it showed "Verified" correctly while this page,
+                  reading the stale session object, kept showing blocked. */}
+              {wallet.kycVerified ? (
                 <button
                   type="button"
                   onClick={() => setShowAddBalance(true)}

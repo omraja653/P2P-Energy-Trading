@@ -20,9 +20,18 @@ router.get('/', requireAuth, async (req, res, next) => {
     }
     const [summary, user] = await Promise.all([
       revenueService.getLifetimeSummary(req.user.id, req.user.type),
-      User.findById(req.user.id).select('walletBalance'),
+      // Real bug fixed here: Wallet.jsx used to read kycVerified from
+      // useAuth()'s cached session `user` — a snapshot taken at login
+      // time, never refreshed by an admin approving KYC on a totally
+      // separate session. UserProfile's Verification Status page never
+      // had this bug because it already does its own fresh GET /profile
+      // fetch. Rather than add a second fetch to Wallet.jsx, this route
+      // already does a fresh DB lookup for walletBalance on every load —
+      // selecting kycVerified from that same query gives the frontend a
+      // truthful value for free.
+      User.findById(req.user.id).select('walletBalance kycVerified'),
     ]);
-    res.json({ ...summary, walletBalance: user?.walletBalance ?? 0 });
+    res.json({ ...summary, walletBalance: user?.walletBalance ?? 0, kycVerified: user?.kycVerified ?? false });
   } catch (err) {
     next(err);
   }

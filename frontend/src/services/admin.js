@@ -84,6 +84,18 @@ export async function setSettlementStatus(id, status, blockchainTxHash) {
   return data
 }
 
+// Real gap this filled: every other function above hits /admin/settlements
+// (the read/override oversight API — routes/admin/settlements.js), but
+// nothing anywhere in the frontend ever called the ACTUAL
+// blockchain-triggering endpoint, POST /api/settlements/:tradeId
+// (routes/settlements.js — a different, non-admin-namespaced router).
+// The settlement pipeline itself already works and was verified live
+// on-chain; there was just no button anywhere that called it.
+export async function triggerSettlement(tradeId) {
+  const { data } = await api.post(`/settlements/${tradeId}`)
+  return data
+}
+
 // --- Metrics / analytics / logs -----------------------------------------------
 export async function fetchAdminDashboard() {
   const { data } = await api.get('/admin/dashboard')

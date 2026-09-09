@@ -88,7 +88,19 @@ function AdminTrades() {
                     <td className="px-3 py-2 text-slate-500">{formatDate(t.createdAt)}</td>
                     <td className="px-3 py-2"><StatusBadge status={t.status} /></td>
                     <td className="px-3 py-2">
-                      <button onClick={() => openTrade(t._id)} className="rounded border border-slate-300 px-2 py-1 text-xs font-medium hover:bg-slate-50">View</button>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => openTrade(t._id)} className="rounded border border-slate-300 px-2 py-1 text-xs font-medium hover:bg-slate-50">View</button>
+                        {/* Settlement is automatic now (jobs/settlementScheduler.js
+                            checks every minute for trades matched over a
+                            minute ago) — no manual trigger needed here.
+                            The real POST /api/settlements/:tradeId endpoint
+                            still exists as an admin override if a trade
+                            ever needs a manual retry; it's just not wired
+                            to a button on this page anymore. */}
+                        {['matched', 'verified'].includes(t.status) && (
+                          <span className="text-xs text-slate-400">Awaiting auto-settlement</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

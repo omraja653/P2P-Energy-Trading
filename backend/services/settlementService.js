@@ -1,6 +1,7 @@
 const { Settlement, User } = require('../models');
 const SystemSettings = require('../models/SystemSettings');
-const { recordTradeOnChain } = require('./blockchainService');
+const { recordTradeOnChain, settleOnChain } = require('./blockchainService');
+const socketService = require('./socket');
 
 // Fallback defaults if SystemSettings can't be read for some reason — kept
 // in sync with the schema defaults in models/SystemSettings.js.
@@ -55,15 +56,60 @@ async function settleTrade(trade) {
       );
     }
 
-    const txHash = await recordTradeOnChain({
+    const { txHash, onChainTradeId, totalPriceWei } = await recordTradeOnChain({
       buyerAddress: buyer.walletAddress,
       sellerAddress: seller.walletAddress,
       quantityKWh: trade.quantityKWh,
       totalAmount: trade.totalAmount,
     });
 
-    settlement.status = 'completed';
     settlement.blockchainTxHash = txHash;
+    if (onChainTradeId != null) settlement.onChainTradeId = onChainTradeId.toString();
+
+    // Settlement.sol's own settleTrade(tradeId) call — a second, separate
+    // on-chain transaction (see blockchainService.settleOnChain for what
+    // it actually does and why the amount it moves is real MATIC but
+    // economically meaningless). Best-effort and non-fatal on purpose:
+    // the settlement this function exists to do — the real fee split and
+    // the EnergyTrade audit record above — already succeeded by this
+    // point, and this second leg is decorative/proof-of-concept, not the
+    // thing Wallet.jsx/TradeHistory.jsx's settlement figures depend on.
+    // A failure here (e.g. the platform wallet running low on testnet
+    // MATIC) shouldn't undo or block a real, already-successful settlement.
+    if (onChainTradeId != null) {
+      try {
+        settlement.settlementContractTxHash = await settleOnChain(onChainTradeId, totalPriceWei);
+      } catch (settlementContractErr) {
+        console.error(
+          `Settlement.settleTrade on-chain call failed for trade ${trade._id} (tradeId ${onChainTradeId}):`,
+          settlementContractErr.message
+        );
+      }
+    }
+
+    // Real design change from an earlier fix: the seller used to be
+    // credited the FULL gross totalAmount at match time, with this
+    // function deducting the fee back out at settlement time to arrive
+    // at the net figure. That worked, but needed a negative-balance
+    // guard (a role-switched seller could spend the gross credit as a
+    // consumer before settlement ran) and briefly showed the wrong
+    // number in between. Now the seller is never credited at match time
+    // at all (see slotMatchingService.js / routes/trades.js) — this is
+    // their one and only credit, for exactly prosumerAmount. Purely
+    // additive, so no balance-gate is needed here.
+    if (prosumerAmount > 0) {
+      const sellerAfter = await User.findByIdAndUpdate(
+        trade.sellerId,
+        { $inc: { walletBalance: prosumerAmount } },
+        { new: true }
+      ).select('walletBalance');
+      socketService.emitWalletUpdated(trade.sellerId, {
+        walletBalance: sellerAfter.walletBalance,
+        transaction: { type: 'sale', amount: prosumerAmount },
+      });
+    }
+
+    settlement.status = 'completed';
     settlement.settledAt = new Date();
     await settlement.save();
   } catch (err) {
@@ -75,4 +121,27 @@ async function settleTrade(trade) {
   return settlement;
 }
 
-module.exports = { settleTrade, PLATFORM_FEE_RATE, GRID_WHEEL_RATE };
+/**
+ * Shared by the admin-triggered route and the automatic scheduler
+ * (jobs/settlementScheduler.js) — settles a trade, updates its status/
+ * blockchain fields, and emits the same live event either path already
+ * relied on, so the two callers can't drift into duplicating (or
+ * disagreeing on) this bookkeeping.
+ */
+async function settleTradeAndUpdateTrade(trade) {
+  const settlement = await settleTrade(trade);
+  trade.status = 'settled';
+  trade.blockchainTxHash = settlement.blockchainTxHash;
+  trade.settledAt = settlement.settledAt;
+  await trade.save();
+
+  socketService.emitOrderStatusChanged([String(trade.sellerId), String(trade.buyerId)], {
+    orderId: String(trade._id),
+    newStatus: trade.status,
+    blockchainHash: trade.blockchainTxHash,
+  });
+
+  return settlement;
+}
+
+module.exports = { settleTrade, settleTradeAndUpdateTrade, PLATFORM_FEE_RATE, GRID_WHEEL_RATE };
