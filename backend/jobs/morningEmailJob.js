@@ -17,7 +17,7 @@ const SEND_GAP_MS = process.env.NODE_ENV === 'test' ? 0 : 200;
 
 const ENABLED = process.env.MORNING_EMAIL_ENABLED !== 'false'; // default on
 const HOUR_IST = clampHour(Number(process.env.MORNING_EMAIL_HOUR_IST));
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+const FRONTEND_URL = 'https://p2-p-energy-trading-c6yxjp9xu-om-rajas-projects.vercel.app';
 
 let timeoutHandle = null;
 let intervalHandle = null;
@@ -83,7 +83,7 @@ async function runOnce(opts = {}) {
   }).select('email firstName');
 
   const marketplaceUrl = `${FRONTEND_URL}/marketplace`;
-  const ordersUrl = `${FRONTEND_URL}/orders`;
+  const tradeHistoryUrl = `${FRONTEND_URL}/trade-history`;
 
   let sent = 0;
   let failed = 0;
@@ -92,7 +92,7 @@ async function runOnce(opts = {}) {
       toEmail: u.email,
       firstName: u.firstName,
       marketplaceUrl,
-      ordersUrl,
+      tradeHistoryUrl,
       unsubscribeUrl: buildUnsubscribeUrl(u._id),
     });
     if (res.delivered) sent += 1;

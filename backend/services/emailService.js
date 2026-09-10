@@ -107,7 +107,7 @@ async function sendTicketNotification({ toEmail, subject, heading, body }) {
  * header). Returns rather than throws on a send failure so one bad address
  * doesn't abort the whole morning batch.
  */
-async function sendTradingReminder({ toEmail, firstName, marketplaceUrl, ordersUrl, unsubscribeUrl }) {
+async function sendTradingReminder({ toEmail, firstName, marketplaceUrl, tradeHistoryUrl, unsubscribeUrl }) {
   const hi = firstName ? `Good morning, ${firstName}!` : 'Good morning!';
   const text = [
     hi,
@@ -115,7 +115,7 @@ async function sendTradingReminder({ toEmail, firstName, marketplaceUrl, ordersU
     'The energy trading market is open today. Place your buy or sell orders in the marketplace — the market clears every couple of minutes and everyone trades at one fair price set by supply and demand.',
     '',
     `Go to the marketplace: ${marketplaceUrl}`,
-    `View your orders: ${ordersUrl}`,
+    `View your trade history: ${tradeHistoryUrl}`,
     '',
     '— GridMate',
     '',
@@ -130,7 +130,7 @@ async function sendTradingReminder({ toEmail, firstName, marketplaceUrl, ordersU
       <p style="margin:20px 0">
         <a href="${marketplaceUrl}" style="background:#009687;color:#fff;padding:11px 20px;border-radius:6px;text-decoration:none;display:inline-block">Go to Marketplace</a>
         &nbsp;
-        <a href="${ordersUrl}" style="color:#009687;padding:11px 4px;text-decoration:underline;display:inline-block">View my orders</a>
+        <a href="${tradeHistoryUrl}" style="color:#009687;padding:11px 4px;text-decoration:underline;display:inline-block">View my orders</a>
       </p>
       <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0">
       <p style="font-size:13px;color:#64748b">— GridMate</p>

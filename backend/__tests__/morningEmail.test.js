@@ -56,11 +56,15 @@ describe('morningEmailJob.runOnce', () => {
     expect(summary.sent).toBeGreaterThanOrEqual(1);
   });
 
-  it('every reminder carries marketplace / orders / unsubscribe links', async () => {
+  it('every reminder carries marketplace / trade-history / unsubscribe links', async () => {
     await morningEmailJob.runOnce({ force: true });
     const arg = sendTradingReminder.mock.calls.find((c) => c[0].toEmail === `${TAG}-in@mtest.io`)[0];
-    expect(arg.marketplaceUrl).toMatch(/\/marketplace$/);
-    expect(arg.ordersUrl).toMatch(/\/orders$/);
+    expect(arg.marketplaceUrl).toBe(
+      'https://p2-p-energy-trading-c6yxjp9xu-om-rajas-projects.vercel.app/marketplace'
+    );
+    expect(arg.tradeHistoryUrl).toBe(
+      'https://p2-p-energy-trading-c6yxjp9xu-om-rajas-projects.vercel.app/trade-history'
+    );
     expect(arg.unsubscribeUrl).toContain('/api/notifications/email/unsubscribe?token=');
   });
 });
