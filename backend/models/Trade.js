@@ -46,6 +46,15 @@ const tradeSchema = new mongoose.Schema(
       default: 'matched',
     },
     blockchainTxHash: { type: String, default: null },
+    // Set only on trades created by the double-auction venue
+    // (jobs/auctionScheduler.js). `auctionRound` is the round number it
+    // cleared in; `clearingPrice` is the single uniform price every trade
+    // in that round settled at (equal to pricePerKwh for these — kept as a
+    // distinct field so the UI can label it "clearing price" and so a
+    // future non-uniform mechanism wouldn't have to overload pricePerKwh).
+    // null on every instant-matched / listing-matched trade.
+    auctionRound: { type: Number, default: null },
+    clearingPrice: { type: Number, default: null },
     matchedAt: { type: Date, default: Date.now },
     verifiedAt: { type: Date, default: null },
     settledAt: { type: Date, default: null },

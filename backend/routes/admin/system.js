@@ -71,6 +71,26 @@ router.post('/system/broadcast', async (req, res, next) => {
   }
 });
 
+// Fire the daily trading-reminder email now, on demand (admin-only — this
+// whole router is behind requireRole('admin')). `force` bypasses the
+// once-per-day dedupe so it can actually be tested more than once a day.
+// Returns the send summary { recipients, sent, failed, skipped }.
+router.post('/system/test-morning-email', async (req, res, next) => {
+  try {
+    const summary = await require('../../jobs/morningEmailJob').runOnce({ force: true });
+    await adminLogService.logAction(
+      req.user.id,
+      'system.test-morning-email',
+      'system',
+      null,
+      `sent=${summary.sent} failed=${summary.failed} skipped=${summary.skipped} of ${summary.recipients}`
+    );
+    res.json(summary);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/system/broadcasts', async (req, res, next) => {
   try {
     const announcements = await Announcement.find().sort({ createdAt: -1 }).limit(20).populate('sentBy', 'firstName lastName');

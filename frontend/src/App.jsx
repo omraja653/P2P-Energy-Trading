@@ -14,15 +14,17 @@ import AdminReports from './pages/AdminReports.jsx'
 import AdminSystemHealth from './pages/AdminSystemHealth.jsx'
 import AdminSettings from './pages/AdminSettings.jsx'
 import TradeHistory from './pages/TradeHistory.jsx'
-import Marketplace from './pages/Marketplace.jsx'
+// pages/Marketplace.jsx (the EnergyListing "Buy Now" grid) and pages/Bid.jsx
+// / pages/SlotTrading.jsx (instant bid/ask) are intentionally no longer
+// imported or routed — the double auction (AuctionMarket) is the single
+// trading mechanism. The files are kept for reference / quick rollback.
 import SupportCenter from './pages/SupportCenter.jsx'
 import TicketDetail from './pages/TicketDetail.jsx'
 import SupportDashboard from './pages/SupportDashboard.jsx'
 import SupportTicketDetail from './pages/SupportTicketDetail.jsx'
 import UserProfile from './pages/UserProfile.jsx'
 import ForecastDashboard from './pages/ForecastDashboard.jsx'
-import SlotTrading from './pages/SlotTrading.jsx'
-import Bid from './pages/Bid.jsx'
+import AuctionMarket from './pages/AuctionMarket.jsx'
 import RevenueManagement from './pages/RevenueManagement.jsx'
 import NotFound from './pages/NotFound.jsx'
 import { useAuth } from './hooks/useAuth.js'
@@ -99,14 +101,26 @@ function App() {
         <Route path="/admin/reports" element={<RequireAdmin><AdminReports /></RequireAdmin>} />
         <Route path="/admin/system-health" element={<RequireAdmin><AdminSystemHealth /></RequireAdmin>} />
         <Route path="/admin/settings" element={<RequireAdmin><AdminSettings /></RequireAdmin>} />
+        {/* The marketplace IS the periodic double auction now — it's the
+            single trading mechanism. AuctionMarket renders here under the
+            plain "/marketplace" path (Navbar's "Marketplace" tab already
+            points at it). The older instant-match surfaces (the
+            EnergyListing "Buy Now" grid in pages/Marketplace.jsx, and the
+            /bid + /slots bid pages) are unrouted below but their code and
+            backend routes are kept intact/dormant — re-adding a <Route> is
+            all it takes to bring any of them back. */}
         <Route
           path="/marketplace"
           element={
-            <VerificationGate>
-              <Marketplace />
-            </VerificationGate>
+            <RequireTrader>
+              <VerificationGate>
+                <AuctionMarket />
+              </VerificationGate>
+            </RequireTrader>
           }
         />
+        {/* Old bookmarks / the previous "Try the Double Auction" link. */}
+        <Route path="/auction" element={<Navigate to="/marketplace" replace />} />
         <Route
           path="/trade-history"
           element={
@@ -130,30 +144,10 @@ function App() {
           }
         />
         <Route
-          path="/slots"
-          element={
-            <RequireTrader>
-              <VerificationGate>
-                <SlotTrading />
-              </VerificationGate>
-            </RequireTrader>
-          }
-        />
-        <Route
           path="/revenue"
           element={
             <RequireTrader>
               <RevenueManagement />
-            </RequireTrader>
-          }
-        />
-        <Route
-          path="/bid"
-          element={
-            <RequireTrader>
-              <VerificationGate>
-                <Bid />
-              </VerificationGate>
             </RequireTrader>
           }
         />

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.js'
 import { useFetch } from '../hooks/useFetch.js'
 import { buyEnergy } from '../services/trades.js'
@@ -297,7 +298,14 @@ function Marketplace() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">P2P Energy Marketplace</h1>
-            <p className="text-sm text-slate-500">Real-time double-auction — every pending sell and buy bid, visible to everyone.</p>
+            <p className="text-sm text-slate-500">
+              Instant matching — every pending sell and buy bid, visible to everyone, paired the moment prices cross.
+            </p>
+            <p className="mt-1 text-sm">
+              <Link to="/auction" className="font-medium text-teal-600 underline">
+                Prefer one fair clearing price for everyone? Try the Double Auction →
+              </Link>
+            </p>
           </div>
           <button
             type="button"

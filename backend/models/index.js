@@ -13,6 +13,7 @@ const ForecastData = require('./ForecastData');
 const TradingSlot = require('./TradingSlot');
 const TradeNotification = require('./TradeNotification');
 const Transaction = require('./Transaction');
+const AuctionOrder = require('./AuctionOrder');
 
 module.exports = {
   User,
@@ -30,4 +31,5 @@ module.exports = {
   TradingSlot,
   TradeNotification,
   Transaction,
+  AuctionOrder,
 };

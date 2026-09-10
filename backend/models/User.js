@@ -142,6 +142,12 @@ const userSchema = new mongoose.Schema(
     bio: { type: String, trim: true, maxlength: 200 },
     address: { type: String, trim: true, maxlength: 300 },
     lastLogin: { type: Date },
+    // Opt-out for the daily "trading session active" reminder email
+    // (jobs/morningEmailJob.js). Default false = opted in. Flipped to true
+    // by the one-click unsubscribe link carried in every such email
+    // (GET /api/notifications/email/unsubscribe). Only affects that one
+    // marketing-style email — OTP / password-reset / ticket mails ignore it.
+    dailyEmailOptOut: { type: Boolean, default: false },
     // Set on account creation and every successful password change — lets
     // the profile page show "Password last changed X days ago".
     passwordChangedAt: { type: Date },

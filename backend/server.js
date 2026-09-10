@@ -56,6 +56,15 @@ if (require.main === module) {
   // data and the real chain). Only actually starts when this file is
   // run directly, i.e. the real dev/production server.
   require('./jobs/settlementScheduler').start();
+  // Same guard/reasoning as the settlement scheduler: a real setInterval
+  // that clears auction rounds (moving money, creating Trades, and feeding
+  // the on-chain settlement flow) must never run inside the Jest workers,
+  // each of which does `require('../server')`.
+  require('./jobs/auctionScheduler').start();
+  // Same guard: this fires a daily timer that emails real users. In the
+  // Jest workers it must stay dormant (and `require('./models')` isn't
+  // even connected there).
+  require('./jobs/morningEmailJob').start();
 }
 
 module.exports = app;

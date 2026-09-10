@@ -195,12 +195,18 @@ PATCH  /api/auth/role
 GET    /api/auth/me
 ```
 
-**Trading (protected by verification middleware)**
+**Trading — double auction (protected by verification middleware)**
 ```
-GET    /api/listings                    # All active listings
-POST   /api/trades                      # Create trade
-GET    /api/trades                      # User's trade history
+POST   /api/auction/orders              # Place a buy/sell order
+GET    /api/auction/orders              # Current round's order-book depth
+GET    /api/auction/orders/mine         # Your orders
+POST   /api/auction/orders/:id/cancel   # Cancel a pending order
+GET    /api/auction/matches             # Your cleared trades
+GET    /api/trades                      # Full trade history (all mechanisms)
 ```
+Orders accumulate silently; every `AUCTION_INTERVAL_MS` (default 120s) the
+engine computes one market-clearing price and matches every eligible order
+at it. Settlement then runs automatically via the settlement scheduler.
 
 **Chat**
 ```

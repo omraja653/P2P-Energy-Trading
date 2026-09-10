@@ -48,6 +48,16 @@ function emitBidCancelled(bidId) {
   if (io) io.emit('bid-cancelled', { bidId });
 }
 
+/**
+ * Broadcast — a double-auction round just closed. Payload is a summary
+ * (round number, clearing price, cleared volume, trade count); each client
+ * refetches its own orders/matches rather than the server fanning out
+ * per-user detail here.
+ */
+function emitAuctionCompleted(summary) {
+  if (io) io.emit('auction-completed', summary);
+}
+
 // --- Orders-facing events (targeted at the two users involved) ---------------
 
 /** `userIds`: array of user ids to notify — typically [buyerId, sellerId]. */
@@ -106,6 +116,7 @@ module.exports = {
   emitNewBid,
   emitBidMatched,
   emitBidCancelled,
+  emitAuctionCompleted,
   emitOrderStatusChanged,
   emitOrderCancelled,
   emitNewSupportTicket,
