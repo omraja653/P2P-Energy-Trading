@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # GridMate --- Blockchain-Based Peer-to-Peer Energy Trading Platform
 
 > **Capstone Project · Group 23 · MIT World Peace University ·
