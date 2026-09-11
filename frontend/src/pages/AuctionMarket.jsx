@@ -16,7 +16,7 @@ const REFRESH_MS = 5000
 // (book.settlementGapMs, jobs/auctionScheduler.js's SETTLEMENT_GAP_MS) so
 // this stays correct even if that env var is overridden. Only used for the
 // first render or if a fetch briefly fails.
-const DEFAULT_SETTLEMENT_GAP_MS = 10 * 60 * 1000
+const DEFAULT_SETTLEMENT_GAP_MS = 5 * 60 * 1000
 
 function Countdown({ targetMs }) {
   const [remaining, setRemaining] = useState(targetMs)
@@ -98,16 +98,6 @@ function AuctionMarket() {
     e.preventDefault()
     setError('')
     setNotice('')
-    if (!isCollecting) {
-      // Defense in depth — the button is disabled for this same reason, but
-      // a stale countdown tick shouldn't let a submit slip through. Note:
-      // this is a UI nudge only, not a real restriction — the backend still
-      // accepts orders during the buffer (they simply wait for the next
-      // round, see jobs/auctionScheduler.js), so nothing is lost by this
-      // being briefly out of sync with the server's own clock.
-      setError('This round is being settled — new orders open again once the next round starts.')
-      return
-    }
     if (!quantity || !price) {
       setError('Fill in quantity and price.')
       return
@@ -153,8 +143,8 @@ function AuctionMarket() {
           </div>
         ) : (
           <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            🟡 Settlement processing… next auction in <Countdown targetMs={phaseCountdownMs} /> — this round's trades
-            are being settled; new orders open again once it starts.
+            🟡 Settlement processing… <strong>Place orders for NEXT auction!</strong> Next auction in{' '}
+            <Countdown targetMs={phaseCountdownMs} />.
           </div>
         )}
 
@@ -202,7 +192,7 @@ function AuctionMarket() {
 
             {!isCollecting && (
               <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                🟡 This round is being settled — placing new orders reopens once the next round starts.
+                🟡 Place orders for NEXT auction!
               </p>
             )}
 
@@ -210,11 +200,11 @@ function AuctionMarket() {
 
             <button
               type="submit"
-              disabled={submitting || !isCollecting}
+              disabled={submitting}
               style={{ backgroundColor: isCollecting ? 'rgb(76, 175, 80)' : 'rgb(217, 119, 6)' }}
               className="mt-4 w-full rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
-              {submitting ? '⏳ Submitting…' : isCollecting ? `✅ Submit ${side} Order` : '⏳ Settlement processing…'}
+              {submitting ? '⏳ Submitting…' : isCollecting ? `✅ Submit ${side} Order` : `✅ Place ${side} Order for NEXT auction`}
             </button>
           </form>
 

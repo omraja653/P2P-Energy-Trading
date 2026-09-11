@@ -11,7 +11,7 @@ const socketService = require('../services/socket');
 // hammer the blockchain (each cleared trade is later settled on-chain by
 // settlementScheduler, which costs real testnet gas). Override with
 // AUCTION_INTERVAL_MS if needed.
-const AUCTION_INTERVAL_MS = Number(process.env.AUCTION_INTERVAL_MS) || 5 * 60 * 1000;
+const AUCTION_INTERVAL_MS = Number(process.env.AUCTION_INTERVAL_MS) || 180000;
 
 // Buffer between a round clearing and the next one starting to collect.
 // This does NOT make the next round wait for settlement to actually finish
@@ -22,7 +22,7 @@ const AUCTION_INTERVAL_MS = Number(process.env.AUCTION_INTERVAL_MS) || 5 * 60 * 
 // It's a fixed scheduling gap only, so the batch that just cleared has
 // clear room on the settlement scheduler's queue before another batch of
 // trades lands on top of it. Override with SETTLEMENT_GAP_MS if needed.
-const SETTLEMENT_GAP_MS = Number(process.env.SETTLEMENT_GAP_MS) || 10 * 60 * 1000;
+const SETTLEMENT_GAP_MS = Number(process.env.SETTLEMENT_GAP_MS) || 300000;
 
 // The actual tick period: collection window + settlement buffer.
 const ROUND_CYCLE_MS = AUCTION_INTERVAL_MS + SETTLEMENT_GAP_MS;
