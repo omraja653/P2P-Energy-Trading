@@ -3,7 +3,7 @@ const { requireAuth } = require('../middleware/auth');
 const { requireTradingVerification } = require('../middleware/verification');
 const { requireFields } = require('../middleware/validation');
 const { AuctionOrder, Trade, User } = require('../models');
-const { ROUND_CYCLE_MS } = require('../jobs/auctionScheduler');
+const { ROUND_CYCLE_MS, SETTLEMENT_GAP_MS } = require('../jobs/auctionScheduler');
 
 const router = express.Router();
 
@@ -108,6 +108,10 @@ router.get('/orders', requireAuth, async (req, res, next) => {
       buy: { count: buys.length, totalQuantity: round4(sum(buys)), ladder: ladder(buys) },
       sell: { count: sells.length, totalQuantity: round4(sum(sells)), ladder: ladder(sells) },
       nextRoundInMs: msUntilNextRound(),
+      // So the frontend's "collecting vs settlement buffer" phase boundary
+      // always matches this server's actual configured gap, even if
+      // SETTLEMENT_GAP_MS is overridden via env — never hardcode it client-side.
+      settlementGapMs: SETTLEMENT_GAP_MS,
     });
   } catch (err) {
     next(err);

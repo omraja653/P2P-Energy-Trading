@@ -12,6 +12,11 @@ import {
 } from '../services/auction.js'
 
 const REFRESH_MS = 5000
+// Fallback only — the real value always comes from the server
+// (book.settlementGapMs, jobs/auctionScheduler.js's SETTLEMENT_GAP_MS) so
+// this stays correct even if that env var is overridden. Only used for the
+// first render or if a fetch briefly fails.
+const DEFAULT_SETTLEMENT_GAP_MS = 10 * 60 * 1000
 
 function Countdown({ targetMs }) {
   const [remaining, setRemaining] = useState(targetMs)
@@ -41,6 +46,7 @@ function AuctionMarket() {
   const [submitting, setSubmitting] = useState(false)
   const nextRoundMsRef = useRef(0)
   const [nextRoundMs, setNextRoundMs] = useState(0)
+  const [settlementGapMs, setSettlementGapMs] = useState(DEFAULT_SETTLEMENT_GAP_MS)
 
   const load = useCallback(() => {
     fetchAuctionBook()
@@ -48,11 +54,25 @@ function AuctionMarket() {
         setBook(b)
         nextRoundMsRef.current = b.nextRoundInMs
         setNextRoundMs(b.nextRoundInMs)
+        if (b.settlementGapMs) setSettlementGapMs(b.settlementGapMs)
       })
       .catch(() => setError('Could not load the auction book.'))
     fetchMyAuctionOrders().then(setMyOrders).catch(() => {})
     fetchMyAuctionMatches().then(setMatches).catch(() => {})
   }, [])
+
+  // A round is "collecting" (orders open) for the first stretch of the
+  // cycle, then sits in the settlement buffer (jobs/auctionScheduler.js —
+  // gives settlementScheduler time to work through the batch that just
+  // cleared) until the next round fires. nextRoundMs counts down the WHOLE
+  // cycle, so "still collecting" is simply "more than settlementGapMs is
+  // left before the next round" — once we're inside that last stretch,
+  // we're in the buffer.
+  const isCollecting = nextRoundMs > settlementGapMs
+  // The number actually shown differs by phase: while collecting, count
+  // down to when collection closes (not all the way to the next round);
+  // once in the buffer, count down to the next round itself.
+  const phaseCountdownMs = isCollecting ? nextRoundMs - settlementGapMs : nextRoundMs
 
   useEffect(() => {
     load()
@@ -78,6 +98,16 @@ function AuctionMarket() {
     e.preventDefault()
     setError('')
     setNotice('')
+    if (!isCollecting) {
+      // Defense in depth — the button is disabled for this same reason, but
+      // a stale countdown tick shouldn't let a submit slip through. Note:
+      // this is a UI nudge only, not a real restriction — the backend still
+      // accepts orders during the buffer (they simply wait for the next
+      // round, see jobs/auctionScheduler.js), so nothing is lost by this
+      // being briefly out of sync with the server's own clock.
+      setError('This round is being settled — new orders open again once the next round starts.')
+      return
+    }
     if (!quantity || !price) {
       setError('Fill in quantity and price.')
       return
@@ -112,14 +142,21 @@ function AuctionMarket() {
       <div className="mx-auto max-w-5xl p-6 md:p-8">
         <h1 className="text-2xl font-bold text-slate-900">⚡ Marketplace</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Place a buy or sell order. Every couple of minutes the market clears and{' '}
-          <strong>everyone trades at one fair price</strong> set by supply and demand. You are a{' '}
-          <strong className="capitalize">{user?.type}</strong>, so your orders are always <strong>{side}</strong>.
+          Place a buy or sell order while a round is collecting, then wait through a short settlement window before
+          the next one opens — <strong>everyone trades at one fair price</strong> set by supply and demand. You are
+          a <strong className="capitalize">{user?.type}</strong>, so your orders are always <strong>{side}</strong>.
         </p>
 
-        <div className="mt-4 flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
-          ⏰ Next round closes in <Countdown targetMs={nextRoundMs} /> — you can add or cancel orders until then.
-        </div>
+        {isCollecting ? (
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
+            🟢 Auction closes in <Countdown targetMs={phaseCountdownMs} /> — you can add or cancel orders until then.
+          </div>
+        ) : (
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            🟡 Settlement processing… next auction in <Countdown targetMs={phaseCountdownMs} /> — this round's trades
+            are being settled; new orders open again once it starts.
+          </div>
+        )}
 
         {notice && (
           <div className="mt-3 rounded-lg bg-green-50 px-4 py-2 text-sm text-green-800">{notice}</div>
@@ -163,15 +200,21 @@ function AuctionMarket() {
               never worse. If it settles worse than your limit, your order simply doesn't trade this round.
             </p>
 
+            {!isCollecting && (
+              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                🟡 This round is being settled — placing new orders reopens once the next round starts.
+              </p>
+            )}
+
             {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
             <button
               type="submit"
-              disabled={submitting}
-              style={{ backgroundColor: 'rgb(76, 175, 80)' }}
+              disabled={submitting || !isCollecting}
+              style={{ backgroundColor: isCollecting ? 'rgb(76, 175, 80)' : 'rgb(217, 119, 6)' }}
               className="mt-4 w-full rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
-              {submitting ? '⏳ Submitting…' : `✅ Submit ${side} Order`}
+              {submitting ? '⏳ Submitting…' : isCollecting ? `✅ Submit ${side} Order` : '⏳ Settlement processing…'}
             </button>
           </form>
 
