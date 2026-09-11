@@ -4,13 +4,28 @@ const { runAuction } = require('../services/doubleAuctionEngine');
 const { notifyMatch } = require('../services/notificationService');
 const socketService = require('../services/socket');
 
-// How often a round closes. The pasted spec wanted 15 min (prod) / 30 s
-// (demo); 2 minutes is the compromise actually used here — long enough for
-// a few orders to pile up so the clearing-price behaviour is visible, short
-// enough to demo in a sitting, and it does NOT hammer the blockchain (each
-// cleared trade is later settled on-chain by settlementScheduler, which
-// costs real testnet gas). Override with AUCTION_INTERVAL_MS if needed.
-const AUCTION_INTERVAL_MS = Number(process.env.AUCTION_INTERVAL_MS) || 2 * 60 * 1000;
+// How long a round collects orders before it clears. The pasted spec wanted
+// 15 min (prod) / 30 s (demo); 5 minutes is the compromise actually used
+// here — long enough for a few orders to pile up so the clearing-price
+// behaviour is visible, short enough to demo in a sitting, and it does NOT
+// hammer the blockchain (each cleared trade is later settled on-chain by
+// settlementScheduler, which costs real testnet gas). Override with
+// AUCTION_INTERVAL_MS if needed.
+const AUCTION_INTERVAL_MS = Number(process.env.AUCTION_INTERVAL_MS) || 5 * 60 * 1000;
+
+// Buffer between a round clearing and the next one starting to collect.
+// This does NOT make the next round wait for settlement to actually finish
+// (settlementScheduler runs on its own independent ~60s cycle and retries
+// forever — coupling round N+1's start to round N's on-chain settlement
+// completing would mean a single slow/stuck settlement, e.g. the relayer
+// wallet running low on testnet gas, freezes the entire auction venue).
+// It's a fixed scheduling gap only, so the batch that just cleared has
+// clear room on the settlement scheduler's queue before another batch of
+// trades lands on top of it. Override with SETTLEMENT_GAP_MS if needed.
+const SETTLEMENT_GAP_MS = Number(process.env.SETTLEMENT_GAP_MS) || 10 * 60 * 1000;
+
+// The actual tick period: collection window + settlement buffer.
+const ROUND_CYCLE_MS = AUCTION_INTERVAL_MS + SETTLEMENT_GAP_MS;
 
 let intervalHandle = null;
 let running = false;
@@ -200,6 +215,9 @@ async function runOnce() {
     console.log(
       `[auctionScheduler] round ${thisRound}: cleared ${summary.clearingQuantity} kWh across ${summary.tradeCount} trade(s) at ₹${plan.clearingPrice}/kWh`
     );
+    console.log(
+      `[auctionScheduler] settlement buffer: next round opens in ${SETTLEMENT_GAP_MS / 60000} min (settlementScheduler has that time to work through round ${thisRound}'s trades before round ${thisRound + 1} lands)`
+    );
     socketService.emitAuctionCompleted(summary);
     return summary;
   } finally {
@@ -209,10 +227,12 @@ async function runOnce() {
 
 function start() {
   if (intervalHandle) return;
-  console.log(`[auctionScheduler] starting — a round closes every ${AUCTION_INTERVAL_MS / 1000}s`);
+  console.log(
+    `[auctionScheduler] starting — ${AUCTION_INTERVAL_MS / 60000} min collection + ${SETTLEMENT_GAP_MS / 60000} min settlement buffer = a new round every ${ROUND_CYCLE_MS / 60000} min`
+  );
   intervalHandle = setInterval(() => {
     runOnce().catch((err) => console.error('[auctionScheduler] round failed:', err.message));
-  }, AUCTION_INTERVAL_MS);
+  }, ROUND_CYCLE_MS);
 }
 
 function stop() {
@@ -222,4 +242,4 @@ function stop() {
   }
 }
 
-module.exports = { start, stop, runOnce, AUCTION_INTERVAL_MS };
+module.exports = { start, stop, runOnce, AUCTION_INTERVAL_MS, SETTLEMENT_GAP_MS, ROUND_CYCLE_MS };

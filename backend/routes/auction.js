@@ -3,18 +3,21 @@ const { requireAuth } = require('../middleware/auth');
 const { requireTradingVerification } = require('../middleware/verification');
 const { requireFields } = require('../middleware/validation');
 const { AuctionOrder, Trade, User } = require('../models');
-const { AUCTION_INTERVAL_MS } = require('../jobs/auctionScheduler');
+const { ROUND_CYCLE_MS } = require('../jobs/auctionScheduler');
 
 const router = express.Router();
 
 // Server start time is a good-enough anchor for "when's the next round":
-// the scheduler's setInterval fires every AUCTION_INTERVAL_MS from process
-// start, so the next boundary is deterministic from here without exporting
-// timer internals.
+// the scheduler's setInterval fires every ROUND_CYCLE_MS (collection window
+// + settlement buffer) from process start, so the next boundary is
+// deterministic from here without exporting timer internals. Was
+// AUCTION_INTERVAL_MS alone before the settlement buffer existed — using
+// just the collection window here would under-report the wait once a
+// buffer sits between rounds.
 const SERVER_START = Date.now();
 function msUntilNextRound() {
   const elapsed = Date.now() - SERVER_START;
-  return AUCTION_INTERVAL_MS - (elapsed % AUCTION_INTERVAL_MS);
+  return ROUND_CYCLE_MS - (elapsed % ROUND_CYCLE_MS);
 }
 
 /**

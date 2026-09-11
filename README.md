@@ -203,9 +203,12 @@ POST   /api/auction/orders/:id/cancel   # Cancel a pending order
 GET    /api/auction/matches             # Your cleared trades
 GET    /api/trades                      # Full trade history (all mechanisms)
 ```
-Orders accumulate silently; every `AUCTION_INTERVAL_MS` (default 120s) the
-engine computes one market-clearing price and matches every eligible order
-at it. Settlement then runs automatically via the settlement scheduler.
+Orders accumulate silently for `AUCTION_INTERVAL_MS` (default 5 min), then
+the engine computes one market-clearing price and matches every eligible
+order at it. A further `SETTLEMENT_GAP_MS` (default 10 min) passes before
+the next round starts collecting, giving the settlement scheduler room to
+work through the batch — 15 minutes between rounds by default. Settlement
+itself then runs automatically via the settlement scheduler.
 
 **Chat**
 ```

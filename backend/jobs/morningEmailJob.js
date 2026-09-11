@@ -17,7 +17,7 @@ const SEND_GAP_MS = process.env.NODE_ENV === 'test' ? 0 : 200;
 
 const ENABLED = process.env.MORNING_EMAIL_ENABLED !== 'false'; // default on
 const HOUR_IST = clampHour(Number(process.env.MORNING_EMAIL_HOUR_IST));
-const FRONTEND_URL = 'https://p2-p-energy-trading-c6yxjp9xu-om-rajas-projects.vercel.app';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://p2p-energy-trading-one.vercel.app';
 
 let timeoutHandle = null;
 let intervalHandle = null;
