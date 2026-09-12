@@ -59,12 +59,15 @@ describe('morningEmailJob.runOnce', () => {
   it('every reminder carries marketplace / trade-history / unsubscribe links', async () => {
     await morningEmailJob.runOnce({ force: true });
     const arg = sendTradingReminder.mock.calls.find((c) => c[0].toEmail === `${TAG}-in@mtest.io`)[0];
-    expect(arg.marketplaceUrl).toBe(
-      'https://p2-p-energy-trading-c6yxjp9xu-om-rajas-projects.vercel.app/marketplace'
-    );
-    expect(arg.tradeHistoryUrl).toBe(
-      'https://p2-p-energy-trading-c6yxjp9xu-om-rajas-projects.vercel.app/trade-history'
-    );
+    // Match by suffix/prefix rather than a hardcoded full domain — the exact
+    // FRONTEND_URL (a Vercel deployment URL) is expected to change over the
+    // project's life, and a test asserting the literal domain breaks every
+    // time it does, for no real coverage gain. What actually matters is
+    // that both links are built from the same configured FRONTEND_URL.
+    expect(arg.marketplaceUrl).toMatch(/\/marketplace$/);
+    expect(arg.tradeHistoryUrl).toMatch(/\/trade-history$/);
+    const base = arg.marketplaceUrl.replace(/\/marketplace$/, '');
+    expect(arg.tradeHistoryUrl).toBe(`${base}/trade-history`);
     expect(arg.unsubscribeUrl).toContain('/api/notifications/email/unsubscribe?token=');
   });
 });
