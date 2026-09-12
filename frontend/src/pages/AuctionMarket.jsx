@@ -219,6 +219,11 @@ function AuctionMarket() {
                   <p className="text-xs font-medium uppercase text-slate-400">Demand</p>
                   <p className="mt-1 text-lg font-bold text-slate-800">{formatKwh(book.buy.totalQuantity)}</p>
                   <p className="text-xs text-slate-400">{book.buy.count} buy order(s)</p>
+                  {book.buy.carriedOverQuantity > 0 && (
+                    <p className="text-xs text-amber-600">
+                      incl. {formatKwh(book.buy.carriedOverQuantity)} carried over from an earlier round
+                    </p>
+                  )}
                   <ul className="mt-2 space-y-0.5 text-xs text-slate-500">
                     {book.buy.ladder.map((l) => (
                       <li key={`b${l.price}`}>{formatKwh(l.quantity)} @ ≤{formatCurrency(l.price)}</li>
@@ -229,6 +234,11 @@ function AuctionMarket() {
                   <p className="text-xs font-medium uppercase text-slate-400">Supply</p>
                   <p className="mt-1 text-lg font-bold text-slate-800">{formatKwh(book.sell.totalQuantity)}</p>
                   <p className="text-xs text-slate-400">{book.sell.count} sell order(s)</p>
+                  {book.sell.carriedOverQuantity > 0 && (
+                    <p className="text-xs text-amber-600">
+                      incl. {formatKwh(book.sell.carriedOverQuantity)} carried over from an earlier round
+                    </p>
+                  )}
                   <ul className="mt-2 space-y-0.5 text-xs text-slate-500">
                     {book.sell.ladder.map((l) => (
                       <li key={`s${l.price}`}>{formatKwh(l.quantity)} @ ≥{formatCurrency(l.price)}</li>

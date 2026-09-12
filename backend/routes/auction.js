@@ -101,12 +101,12 @@ router.post(
 router.get('/orders', requireAuth, async (req, res, next) => {
   try {
     const [buys, sells] = await Promise.all([
-      AuctionOrder.find({ status: 'pending', side: 'BUY' }).select('quantity pricePerKwh').sort({ pricePerKwh: -1 }),
-      AuctionOrder.find({ status: 'pending', side: 'SELL' }).select('quantity pricePerKwh').sort({ pricePerKwh: 1 }),
+      AuctionOrder.find({ status: 'pending', side: 'BUY' }).select('quantity pricePerKwh filledQuantity').sort({ pricePerKwh: -1 }),
+      AuctionOrder.find({ status: 'pending', side: 'SELL' }).select('quantity pricePerKwh filledQuantity').sort({ pricePerKwh: 1 }),
     ]);
     res.json({
-      buy: { count: buys.length, totalQuantity: round4(sum(buys)), ladder: ladder(buys) },
-      sell: { count: sells.length, totalQuantity: round4(sum(sells)), ladder: ladder(sells) },
+      buy: { count: buys.length, totalQuantity: round4(sum(buys)), ladder: ladder(buys), carriedOverQuantity: carriedOver(buys) },
+      sell: { count: sells.length, totalQuantity: round4(sum(sells)), ladder: ladder(sells), carriedOverQuantity: carriedOver(sells) },
       nextRoundInMs: msUntilNextRound(),
       // So the frontend's "collecting vs settlement buffer" phase boundary
       // always matches this server's actual configured gap, even if
@@ -179,6 +179,21 @@ function ladder(orders) {
   const byPrice = new Map();
   for (const o of orders) byPrice.set(o.pricePerKwh, (byPrice.get(o.pricePerKwh) || 0) + o.quantity);
   return [...byPrice.entries()].map(([price, quantity]) => ({ price, quantity: round4(quantity) }));
+}
+// A still-'pending' order with filledQuantity > 0 is, by definition, the
+// unfilled remainder of an order that already partially cleared in an
+// earlier round and rolled forward (see jobs/auctionScheduler.js) — this is
+// the real mechanism behind "auction 1 and auction 2 orders showing
+// together" (confirmed via audit). There's no separate "which round is
+// this order in" field to filter on (see AuctionOrder.js — an order
+// doesn't belong to a round until it clears against one, and forcing a
+// hard round-tag would orphan a rolled-over remainder the first time it
+// missed its original tagged round). Surfacing the carried-over volume as
+// a labeled subtotal — rather than pretending there are two separate order
+// books — tells the truth about what's actually happening without adding
+// a schema change that risks silently losing orders after a restart.
+function carriedOver(orders) {
+  return round4(orders.filter((o) => o.filledQuantity > 0).reduce((t, o) => t + o.quantity, 0));
 }
 
 module.exports = router;

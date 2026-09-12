@@ -62,4 +62,25 @@ describe('doubleAuctionEngine.runAuction', () => {
     runAuction(buys, [sell('s1', 'u3', 10, 4)]);
     expect(buys.map((b) => b._id).join(',')).toBe(before);
   });
+
+  // Regression test for a claimed bug ("1 BUY + 2 SELL should produce 2
+  // trades, not 13") raised during a comprehensive audit. Verified live: the
+  // real, current engine already produces exactly 2 matches for this exact
+  // scenario — the audit traced the "13" figure to 13 separate, correct
+  // trades from 13 separate round-clearings over several hours, all stuck
+  // on an unrelated settlement issue (the relayer wallet running out of
+  // testnet gas), not to any duplicate-matching defect. Kept here
+  // permanently so this specific claim can never silently regress.
+  it('one BUY order matched against two SELL orders produces exactly 2 trades (not more)', () => {
+    const r = runAuction(
+      [buy('b1', 'buyer1', 24, 5)],
+      [sell('s1', 'seller1', 10, 4), sell('s2', 'seller2', 15, 4.2)]
+    );
+    expect(r.cleared).toBe(true);
+    expect(r.matches).toHaveLength(2);
+    expect(r.matches[0].quantity + r.matches[1].quantity).toBe(24);
+    // Each order appears at most once as buyOrderId/sellOrderId across all matches.
+    const sellOrderIds = r.matches.map((m) => m.sellOrderId);
+    expect(new Set(sellOrderIds).size).toBe(sellOrderIds.length);
+  });
 });

@@ -12,6 +12,7 @@ const SETTLEMENT_DELAY_MS = 60 * 1000;
 const CHECK_INTERVAL_MS = 60 * 1000;
 
 let intervalHandle = null;
+let running = false;
 
 /**
  * Finds every trade that's been sitting at 'matched' for longer than the
@@ -21,23 +22,45 @@ let intervalHandle = null;
  * per-trade failure (e.g. a missing wallet address, an RPC hiccup) is
  * logged and left at 'matched' — the next tick retries it automatically,
  * so there's no separate retry/backoff mechanism to build.
+ *
+ * `running` guard added after a real bug found live: with several stuck
+ * trades all failing against a slow/unresponsive RPC endpoint, one full
+ * sweep of dueTrades can take longer than CHECK_INTERVAL_MS — without this
+ * guard the next tick starts before the previous one finishes, and two
+ * concurrent settleTrade() calls for the SAME trade can each pass
+ * settlementService's "does a Settlement already exist" check before
+ * either one's write lands, each creating its own document (confirmed
+ * live: one stuck trade accumulated 5 separate Settlement docs in 3
+ * minutes despite settlementService.js already being fixed to reuse one
+ * document per trade — that fix only closes the sequential-retry case,
+ * not genuinely overlapping ticks). Mirrors auctionScheduler.js's
+ * identical guard.
  */
 async function runOnce() {
-  const cutoff = new Date(Date.now() - SETTLEMENT_DELAY_MS);
-  const dueTrades = await Trade.find({ status: 'matched', createdAt: { $lte: cutoff } });
-
-  for (const trade of dueTrades) {
-    try {
-      const settlement = await settleTradeAndUpdateTrade(trade);
-      console.log(
-        `[settlementScheduler] auto-settled trade ${trade._id} — blockchainTxHash: ${settlement.blockchainTxHash}`
-      );
-    } catch (err) {
-      console.error(`[settlementScheduler] failed to settle trade ${trade._id}:`, err.message);
-    }
+  if (running) {
+    console.log('[settlementScheduler] previous sweep still running — skipping this tick');
+    return 0;
   }
+  running = true;
+  try {
+    const cutoff = new Date(Date.now() - SETTLEMENT_DELAY_MS);
+    const dueTrades = await Trade.find({ status: 'matched', createdAt: { $lte: cutoff } });
 
-  return dueTrades.length;
+    for (const trade of dueTrades) {
+      try {
+        const settlement = await settleTradeAndUpdateTrade(trade);
+        console.log(
+          `[settlementScheduler] auto-settled trade ${trade._id} — blockchainTxHash: ${settlement.blockchainTxHash}`
+        );
+      } catch (err) {
+        console.error(`[settlementScheduler] failed to settle trade ${trade._id}:`, err.message);
+      }
+    }
+
+    return dueTrades.length;
+  } finally {
+    running = false;
+  }
 }
 
 function start() {

@@ -33,14 +33,34 @@ async function settleTrade(trade) {
   const t1Date = new Date();
   t1Date.setDate(t1Date.getDate() + 1);
 
-  const settlement = await Settlement.create({
-    tradeId: trade._id,
-    prosumerAmount,
-    gridWheelAmount,
-    platformAmount,
-    status: 'pending',
-    T1Date: t1Date,
-  });
+  // Idempotent: reuse this trade's existing non-completed Settlement rather
+  // than creating a new document every call. Real bug found live during an
+  // audit — settlementScheduler retries every 'matched' trade every 60s
+  // forever with no cap (by design, see jobs/settlementScheduler.js), and
+  // this used to Settlement.create() unconditionally on every single retry.
+  // With the relayer wallet out of testnet gas, 13 trades stuck retrying
+  // for 6+ hours had produced ~4,800 duplicate 'failed' Settlement rows
+  // between them (7,507 total in the collection). Reusing the same
+  // document means a trade that's been retried 400 times still has exactly
+  // one Settlement row, which flips to 'completed' the moment it succeeds.
+  let settlement = await Settlement.findOne({ tradeId: trade._id, status: { $ne: 'completed' } });
+  if (settlement) {
+    settlement.prosumerAmount = prosumerAmount;
+    settlement.gridWheelAmount = gridWheelAmount;
+    settlement.platformAmount = platformAmount;
+    settlement.status = 'pending';
+    settlement.T1Date = t1Date;
+  } else {
+    settlement = new Settlement({
+      tradeId: trade._id,
+      prosumerAmount,
+      gridWheelAmount,
+      platformAmount,
+      status: 'pending',
+      T1Date: t1Date,
+    });
+  }
+  await settlement.save();
 
   try {
     // Real fix: recordTradeOnChain needs actual wallet addresses, not raw
